@@ -10,7 +10,9 @@ export const RATE_LIMITS = {
 export const ANALYSIS = {
   maxBatch: 100, // bir turda AI'a gönderilecek en fazla mesaj
   staleRunMs: 2 * 60_000, // bu süreden eski "running" kaydı takılmış sayılır
-  autoIntervalMs: 5 * 60_000, // öğretmen paneli açıkken kendiliğinden analiz (n8n'den bağımsız yedek)
+  // Öğretmen paneli açıkken kendiliğinden analiz aralığı (n8n'den bağımsız). Varsayılan 5 dk.
+  // Test/demo için .env.local'a NEXT_PUBLIC_AUTO_ANALYSIS_SECONDS=30 yazılabilir (en az 10 sn).
+  autoIntervalMs: Math.max(10, Number(process.env.NEXT_PUBLIC_AUTO_ANALYSIS_SECONDS) || 300) * 1000,
 } as const;
 
 export const STUDENT_REPLY = "Mesajın öğretmene iletilecek.";

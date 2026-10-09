@@ -175,7 +175,7 @@ async function StudentView({ lesson, participantId }: { lesson: Lesson; particip
       <div className="grid flex-1 gap-6 lg:grid-cols-[1fr_22rem]">
         <VideoArea lesson={lesson} role="student" identity={`student:${participantId}`} />
 
-        <aside className="flex max-h-[36rem] flex-col gap-4 rounded-2xl border border-border bg-card p-5">
+        <aside className="flex h-[34rem] max-h-[85vh] flex-col gap-4 rounded-2xl border border-border bg-card p-5">
           <h2 className="font-semibold">Sorularım</h2>
           <StudentChat
             lessonId={lesson.id}

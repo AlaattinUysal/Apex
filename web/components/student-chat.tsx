@@ -18,20 +18,27 @@ export function StudentChat({
 }) {
   const [state, action, pending] = useActionState(sendMessage, undefined);
   const formRef = useRef<HTMLFormElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
 
   // Başarılı gönderimden sonra kutuyu temizle.
   useEffect(() => {
     if (state?.sentAt) formRef.current?.reset();
   }, [state]);
 
+  // Yeni mesaj gelince (ve ilk açılışta) listeyi en alta kaydır: sohbet yukarıdan aşağı akar, yeni mesaj görünür.
+  useEffect(() => {
+    const list = listRef.current;
+    if (list) list.scrollTo({ top: list.scrollHeight });
+  }, [messages.length]);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
-      <ul className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+      <ul ref={listRef} className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
         {messages.length === 0 && (
           <li className="text-sm text-muted">Henüz mesaj yazmadın. Aklına takılanı yaz, öğretmenine anonim iletilir.</li>
         )}
         {messages.map((m) => (
-          <li key={m.id} className="flex flex-col gap-1">
+          <li key={m.id} className="flex shrink-0 flex-col gap-1">
             <p className="max-w-[85%] self-end rounded-2xl rounded-br-sm bg-accent px-3 py-2 text-sm text-accent-foreground">
               {m.text}
             </p>

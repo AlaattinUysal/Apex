@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { runAnalysis } from "@/lib/analysis";
+import { runAnalysis, type AnalysisResult } from "@/lib/analysis";
 import { createClient } from "@/lib/supabase/server";
 
 // Kart eylemleri RLS ile korunur: öğretmen yalnızca kendi dersinin kartında, yalnızca
@@ -21,11 +21,12 @@ export async function answerCard(lessonId: string, cardId: string) {
   revalidatePath(`/live/${lessonId}`);
 }
 
-// Demo düğmesi: n8n'e bağımlı olmadan aynı analiz kodunu çalıştırır.
-export async function runAnalysisNow(lessonId: string) {
+// Demo düğmesi: n8n'e bağımlı olmadan aynı analiz kodunu çalıştırır. Sonucu arayüzde göstermek için döner.
+export async function runAnalysisNow(lessonId: string): Promise<AnalysisResult | null> {
   const supabase = await createClient();
   // RLS: ders bu öğretmene ait değilse satır dönmez ve analiz çalışmaz.
   const { data: lesson } = await supabase.from("lessons").select("id").eq("id", lessonId).maybeSingle();
-  if (lesson) await runAnalysis(lesson.id);
+  const result = lesson ? await runAnalysis(lesson.id) : null;
   revalidatePath(`/live/${lessonId}`);
+  return result;
 }

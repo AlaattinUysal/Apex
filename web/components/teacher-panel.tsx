@@ -1,9 +1,10 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { answerCard, markCardRead, runAnalysisNow } from "@/app/actions/cards";
 import { setChatbotEnabled } from "@/app/actions/lessons";
+import type { AnalysisResult } from "@/lib/analysis";
 import { ANALYSIS } from "@/lib/config";
 import { createClient } from "@/lib/supabase/client";
 
@@ -16,6 +17,27 @@ export type PanelCard = {
   is_read: boolean;
   has_update: boolean;
 };
+
+type Feedback = { tone: "ok" | "warn" | "error"; text: string; time: string };
+
+// Analiz sonucunu öğretmene anlaşılır bir cümleyle anlatır (düğmeye basınca "bir şey oldu mu?" belli olsun).
+function describe(result: AnalysisResult | null, auto: boolean): Feedback {
+  const time = new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const prefix = auto ? "Otomatik analiz" : "Analiz";
+  if (!result || result.status === "skipped") {
+    return { tone: "warn", time, text: `${prefix}: başka bir analiz sürüyor ya da ders canlı değil.` };
+  }
+  if (result.status === "empty") return { tone: "ok", time, text: `${prefix}: bekleyen mesaj yok.` };
+  if (result.status === "failed") {
+    return { tone: "error", time, text: `${prefix}: yapay zekâ yanıt vermedi. Mesajlar bekliyor, tekrar denenecek.` };
+  }
+  return { tone: "ok", time, text: `${prefix}: ${result.messages} mesaj işlendi, ${result.cards} kart güncellendi.` };
+}
+
+function intervalLabel(ms: number) {
+  const s = Math.round(ms / 1000);
+  return s < 120 ? `${s} saniyede` : `${Math.round(s / 60)} dakikada`;
+}
 
 // Öğretmenin "Gelen Sorular" paneli: yalnızca AI'ın ürettiği konu kartları (ham mesaj yok).
 // Kartlar değişince (yeni kart / güncelleme) Realtime ile sayfayı sunucudan tazeler.
@@ -33,6 +55,14 @@ export function TeacherPanel({
   const router = useRouter();
   const unread = cards.filter((c) => !c.is_read || c.has_update).length;
   const [, startTransition] = useTransition();
+  const [analysing, startAnalysis] = useTransition();
+  const [feedback, setFeedback] = useState<Feedback | null>(null);
+
+  const runAnalysisAndReport = (auto: boolean) =>
+    startAnalysis(async () => {
+      const result = await runAnalysisNow(lessonId);
+      setFeedback(describe(result, auto));
+    });
 
   useEffect(() => {
     const supabase = createClient();
@@ -53,12 +83,9 @@ export function TeacherPanel({
   // Kuyruk boşsa hiçbir şey yapmaz; aynı anda iki tur çalışmasını sunucu engeller.
   useEffect(() => {
     if (!isLive) return;
-    const id = setInterval(() => {
-      startTransition(() => {
-        void runAnalysisNow(lessonId);
-      });
-    }, ANALYSIS.autoIntervalMs);
+    const id = setInterval(() => runAnalysisAndReport(true), ANALYSIS.autoIntervalMs);
     return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLive, lessonId]);
 
   return (
@@ -79,10 +106,25 @@ export function TeacherPanel({
 
       {isLive && (
         <div className="flex flex-col gap-1">
-          <form action={runAnalysisNow.bind(null, lessonId)}>
-            <button className="btn-ghost w-full">Analizi şimdi çalıştır</button>
-          </form>
-          <p className="text-center text-xs text-muted">Her 5 dakikada otomatik de çalışır.</p>
+          <button className="btn-ghost w-full" disabled={analysing} onClick={() => runAnalysisAndReport(false)}>
+            {analysing ? "Analiz çalışıyor…" : "Analizi şimdi çalıştır"}
+          </button>
+          <p
+            role="status"
+            className={`text-center text-xs ${
+              feedback?.tone === "error"
+                ? "text-red-600 dark:text-red-400"
+                : feedback?.tone === "warn"
+                  ? "text-amber-600 dark:text-amber-400"
+                  : "text-muted"
+            }`}
+          >
+            {analysing
+              ? "Mesajlar yapay zekâya gönderiliyor, birkaç saniye sürer…"
+              : feedback
+                ? `${feedback.text} (${feedback.time})`
+                : `Her ${intervalLabel(ANALYSIS.autoIntervalMs)} otomatik de çalışır.`}
+          </p>
         </div>
       )}
 
