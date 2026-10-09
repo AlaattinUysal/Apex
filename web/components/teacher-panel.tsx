@@ -25,6 +25,8 @@ function describe(result: AnalysisResult | null, auto: boolean): Feedback {
   return { tone: "ok", time, text: `${prefix}: ${result.messages} mesaj işlendi, özet güncellendi.` };
 }
 
+const isFeedback = (title: string) => /işleyiş|geri bildirim/.test(title.toLocaleLowerCase("tr"));
+
 function intervalLabel(ms: number) {
   const s = Math.round(ms / 1000);
   return s < 120 ? `${s} saniyede` : `${Math.round(s / 60)} dakikada`;
@@ -49,7 +51,8 @@ export function TeacherPanel({
   const [answering, startAnswering] = useTransition();
   const [analysing, startAnalysis] = useTransition();
   const [feedback, setFeedback] = useState<Feedback | null>(null);
-  const sections = summary?.sections ?? [];
+  // "Ders işleyişi ve geri bildirim" başlığı her zaman en üstte; diğerleri AI'ın verdiği sırada (sıralama kararlı).
+  const sections = [...(summary?.sections ?? [])].sort((a, b) => Number(isFeedback(b.title)) - Number(isFeedback(a.title)));
 
   const runAnalysisAndReport = (auto: boolean) =>
     startAnalysis(async () => {
