@@ -1,10 +1,11 @@
 import json
 import logging
 import asyncio
+import time
 import httpx
 from typing import Dict, Any, List
 
-from app.config import GEMINI_API_KEY, GEMINI_MODEL
+from app.config import GEMINI_API_KEY, GEMINI_MODELS
 from app.models import AnalyzeBatchRequest, AnalyzeBatchResponse, MessageDecision
 from fastapi import HTTPException, status
 
@@ -102,6 +103,10 @@ def generate_mock_response(request: AnalyzeBatchRequest) -> AnalyzeBatchResponse
         updated_cards=[]
     )
 
+# Kotası dolan modeller bu süre boyunca atlanır (model -> monotonic zaman).
+_model_cooldown: Dict[str, float] = {}
+MODEL_COOLDOWN_SECONDS = 120
+
 async def analyze_batch_with_gemini(request: AnalyzeBatchRequest) -> AnalyzeBatchResponse:
     if not GEMINI_API_KEY or GEMINI_API_KEY == "BURAYA_GEMINI_API_KEY_GELECEK":
         logger.error("Geçerli bir GEMINI_API_KEY bulunamadı.")
@@ -137,66 +142,76 @@ async def analyze_batch_with_gemini(request: AnalyzeBatchRequest) -> AnalyzeBatc
     }
 
     # API anahtarı güvenliği: Key URL parametresinde DEĞİL, HTTP header'ında iletilir.
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
     headers = {
         "Content-Type": "application/json; charset=utf-8",
         "x-goog-api-key": GEMINI_API_KEY
     }
 
-    # Kota tasarrufu: En fazla 2 deneme (1 istek + 503 durumunda 1 retry)
+    # Modeller sırayla denenir. Bir model kotayı doldurursa (429) kısa süre atlanır ve sıradakine geçilir.
+    # Kota tasarrufu: başarılı istek 1 istektir; 503'te en fazla 1 yeniden deneme yapılır.
+    last_error = None
     async with httpx.AsyncClient(timeout=35.0) as client:
-        last_error = None
-        for attempt in range(2):
-            try:
-                response = await client.post(
-                    url,
-                    json=gemini_body,
-                    headers=headers
-                )
+        for model in GEMINI_MODELS:
+            if _model_cooldown.get(model, 0) > time.monotonic():
+                logger.info(f"Model {model} kota beklemesinde, atlanıyor.")
+                continue
 
-                if response.status_code == 503:
-                    logger.warning(f"Model {GEMINI_MODEL} 503 döndürdü, bekleniyor... (Deneme {attempt + 1}/2)")
-                    await asyncio.sleep(1.0)
-                    continue
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+            for attempt in range(2):
+                try:
+                    response = await client.post(url, json=gemini_body, headers=headers)
 
-                if response.status_code != 200:
-                    logger.error(f"Gemini API hatası ({response.status_code}): {response.text}")
-                    raise HTTPException(
-                        status_code=status.HTTP_502_BAD_GATEWAY,
-                        detail=f"Gemini API hatası ({response.status_code}): {response.text[:200]}"
-                    )
+                    if response.status_code == 429:
+                        logger.warning(f"Model {model} kotası doldu (429), sıradaki modele geçiliyor.")
+                        _model_cooldown[model] = time.monotonic() + MODEL_COOLDOWN_SECONDS
+                        last_error = f"{model}: kota doldu (429)"
+                        break
 
-                data = response.json()
-                raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
-                
-                # Pydantic doğrulaması
-                parsed = AnalyzeBatchResponse.model_validate_json(raw_text)
+                    if response.status_code == 503:
+                        logger.warning(f"Model {model} 503 döndürdü (Deneme {attempt + 1}/2)")
+                        last_error = f"{model}: 503"
+                        await asyncio.sleep(1.0)
+                        continue
 
-                # Eksik message_id kontrolü (Pydantic MessageDecision modeli olarak eklenir)
-                returned_ids = {m.message_id for m in parsed.messages}
-                for m in request.messages:
-                    if m.message_id not in returned_ids:
-                        logger.warning(f"Eksik message_id ({m.message_id}) tespit edildi. Varsayılan reject ekleniyor.")
-                        parsed.messages.append(
-                            MessageDecision(
-                                message_id=m.message_id,
-                                decision="reject",
-                                reject_reason="unclear",
-                                card_ref=None
-                            )
+                    if response.status_code != 200:
+                        logger.error(f"Gemini API hatası ({response.status_code}): {response.text}")
+                        raise HTTPException(
+                            status_code=status.HTTP_502_BAD_GATEWAY,
+                            detail=f"Gemini API hatası ({response.status_code}): {response.text[:200]}"
                         )
-                return parsed
 
-            except HTTPException:
-                raise
-            except Exception as e:
-                last_error = e
-                logger.warning(f"Gemini istek hatası (Deneme {attempt + 1}/2): {e}")
-                if attempt == 0:
-                    await asyncio.sleep(1.0)
+                    data = response.json()
+                    raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
 
-        logger.error(f"Gemini API başarısız oldu: {last_error}")
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Gemini servisine erişilemedi: {last_error}"
-        )
+                    # Pydantic doğrulaması
+                    parsed = AnalyzeBatchResponse.model_validate_json(raw_text)
+
+                    # Eksik message_id kontrolü (Pydantic MessageDecision modeli olarak eklenir)
+                    returned_ids = {m.message_id for m in parsed.messages}
+                    for m in request.messages:
+                        if m.message_id not in returned_ids:
+                            logger.warning(f"Eksik message_id ({m.message_id}) tespit edildi. Varsayılan reject ekleniyor.")
+                            parsed.messages.append(
+                                MessageDecision(
+                                    message_id=m.message_id,
+                                    decision="reject",
+                                    reject_reason="unclear",
+                                    card_ref=None
+                                )
+                            )
+                    logger.info(f"Analiz tamamlandı (model: {model}).")
+                    return parsed
+
+                except HTTPException:
+                    raise
+                except Exception as e:
+                    last_error = f"{model}: {e}"
+                    logger.warning(f"Gemini istek hatası ({model}, Deneme {attempt + 1}/2): {e}")
+                    if attempt == 0:
+                        await asyncio.sleep(1.0)
+
+    logger.error(f"Tüm modeller başarısız oldu: {last_error}")
+    raise HTTPException(
+        status_code=status.HTTP_502_BAD_GATEWAY,
+        detail=f"Gemini servisine erişilemedi: {last_error}"
+    )
