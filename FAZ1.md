@@ -49,6 +49,33 @@ AI öğretmen **değil**, öğrenci ile öğretmen arasındaki **iletişim arac�
  └─────────────────────────────┘
 ```
 
+### 3.1 Karar: AI Python'da (Seçenek A, onaylandı)
+
+| Parça | Nerede çalışır | Ne yapar |
+|---|---|---|
+| Gemini çağrıları (moderasyon, sadeleştirme, konu etiketi, kümeleme) | **Python / FastAPI** (`ai-service/`) | İstek alır, Gemini'ye sorar, doğrulanmış JSON döner. Veritabanına erişmez. |
+| Mesaj kuyruğu / durum | **Supabase** (`student_messages` tablosu) | Dosya kuyruğu yok; "kuyruk" artık tablodaki onaylı mesajlar. |
+| Orkestrasyon (kimi ne zaman analiz et, sonucu kaydet, bildirim üret) | **Next.js** (`/api/...`) | AI servisini çağırır, sonucu Supabase'e yazar. |
+| 5 dk zamanlayıcı | **n8n** | Sadece Next.js'teki `tick` endpoint'ini çağırır. |
+
+Neden: iki kişi aynı koda dokunmadan çalışır, prompt kalitesi bağımsız iyileştirilir, mantık tek yerde (Python) olduğu için test edilebilir.
+
+### 3.2 Ertuğrul'un mevcut n8n işi ne olacak
+
+| Mevcut parça | Karar |
+|---|---|
+| Gemini prompt metinleri (özetleme, uygunsuz mesajı eleme) | **Python'a taşınır** (`/moderate`, `/cluster`, `/summary` prompt'larına temel olur) |
+| n8n içindeki Gemini HTTP çağrısı | Kalkar (Python yapar) |
+| Dosya kuyruğu (`bekleyen_mesajlar.json`), "Mesajı Kuyruğa Kaydet" | Kalkar (Supabase tablosu) |
+| 5 dk (şu an 30 sn) zamanlayıcı + Manuel Tetikle | **Kalır**, sadece `tick` çağrısı yapacak şekilde sadeleşir |
+| HTML rapor + `GET /ozet` | Kalkar (rapor Next.js'te) |
+| `main.py` test paneli | **Kalır**, Python endpoint'lerini test eden istemciye dönüşür (anonim; öğrenci adı yok) |
+| `docker-compose.yml` (n8n) | Kalır, AI servisi eklenir |
+| `NODE_FUNCTION_ALLOW_*` ayarları | `fs` kullanımı kalkınca gerekmez |
+| Türkçe karakter düzeltme tablosu | UTF-8 ile gönderilince gerekmez; gerekirse kaynağı (`.bat`) düzeltilir |
+
+- Gerçek API anahtarı hiçbir zaman workflow JSON'una yazılıp commit edilmez (`.env` kullanılır).
+
 - Gerçek zamanlılık Supabase Realtime ile (Next.js tarafı, Alaaddin).
 - 5 dk'lık analizi tetikleyen zamanlayıcı n8n'de (Ertuğrul); n8n analiz sonucunu Next.js'in "internal" endpoint'ine veya doğrudan Supabase'e yazar (karar bekliyor, §6-3).
 - Video token'ı: Ertuğrul'un servisi üretir, Next.js `/live` sayfası ister.
@@ -138,7 +165,7 @@ Faz 1 hedefi: **"Öğretmen ders açar, öğrenci kodla girer, iki ayrı arayüz
    - Mevcut workflow'daki dosya kuyruğu (`bekleyen_mesajlar.json`) kalkar; mesajlar zaten Supabase'de.
 3. ✅ **Sonuç platforma nasıl döner:** AI servisi hiçbir şey yazmaz, Next.js yazar (yukarıdaki akış).
 4. ✅ **AI sağlayıcısı: Gemini.** Model adı Ertuğrul'dan teyit edilecek (workflow'daki `gemini-3.8-flash` geçerli mi?). Anahtar sadece AI servisinin `.env`'inde.
-5. ⏳ **Dil:** Python AI servisi (repoda `main.py` var). Ertuğrul'a sorulacak.
+5. ✅ **AI Python/FastAPI'de** (Seçenek A). Seçenekler: A (Python, seçildi), B (kümeleme n8n'de), C (Next.js içinde). Detay §3.1–3.2.
 6. ✅ **Zaman bütçesi: 12 saat.** Kesilenler §7'de, saat planı §8'de.
 6b. ⏳ **Rate limit (önemli, konuşulacak).** Taslak öneri, hepsi Next.js'te (AI'a gitmeden önce) uygulanır:
    - Oturum başına dakikada en fazla **6 mesaj**, ders başına en fazla **30 mesaj**
