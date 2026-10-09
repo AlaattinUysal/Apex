@@ -83,3 +83,64 @@ function mockAnalyze(request: AnalyzeRequest): AnalyzeResponse {
     updated_cards: [],
   };
 }
+
+// ---------------------------------------------------------------------------
+// Tek özet kartı modeli: POST /summarize-batch (kart sistemi yerine).
+// AI servisi stateless: her turda `approved` + `new_messages`'tan özeti baştan üretir.
+// ---------------------------------------------------------------------------
+
+export type SummaryRequest = {
+  lesson: { subject: string; topic: string };
+  approved: { message_id: string; text: string }[]; // önceki turlarda onaylananlar (bu "cevaplandı" döneminde)
+  new_messages: { message_id: string; text: string }[];
+};
+
+export type Summary = { sections: { title: string; items: { text: string }[] }[] };
+
+export type SummaryResponse = {
+  decisions: { message_id: string; decision: "deliver" | "reject"; reject_reason: RejectLabel | null }[];
+  summary: Summary;
+};
+
+export async function summarizeBatch(request: SummaryRequest): Promise<SummaryResponse> {
+  const response =
+    process.env.AI_MOCK === "1" ? mockSummarize(request) : await callSummaryService(request);
+
+  // Her yeni mesaj tam bir kez karara bağlanmalı (ikinci savunma hattı).
+  const wanted = new Set(request.new_messages.map((m) => m.message_id));
+  const seen = new Set<string>();
+  for (const d of response.decisions) {
+    if (!wanted.has(d.message_id) || seen.has(d.message_id)) {
+      throw new Error(`AI cevabı geçersiz: message_id ${d.message_id}`);
+    }
+    seen.add(d.message_id);
+  }
+  if (seen.size !== wanted.size) throw new Error("AI cevabı eksik: bazı mesajlar yanıtlanmamış");
+  return response;
+}
+
+async function callSummaryService(request: SummaryRequest): Promise<SummaryResponse> {
+  const res = await fetch(`${process.env.AI_SERVICE_URL}/summarize-batch`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.INTERNAL_API_KEY}`,
+    },
+    body: JSON.stringify(request),
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+  if (!res.ok) throw new Error(`AI servisi ${res.status} döndü`);
+  return (await res.json()) as SummaryResponse;
+}
+
+function mockSummarize(request: SummaryRequest): SummaryResponse {
+  const all = [...request.approved, ...request.new_messages];
+  return {
+    decisions: request.new_messages.map((m) => ({ message_id: m.message_id, decision: "deliver", reject_reason: null })),
+    summary: {
+      sections: all.length
+        ? [{ title: "Sahte özet (AI_MOCK)", items: [{ text: `${all.length} mesaj sahte olarak özetlendi.` }] }]
+        : [],
+    },
+  };
+}

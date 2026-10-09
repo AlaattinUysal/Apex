@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { setLessonStatus } from "@/app/actions/lessons";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { LiveRoom } from "@/components/live-room";
+import type { Summary } from "@/lib/ai-client";
 import { StudentChat } from "@/components/student-chat";
 import { TeacherPanel } from "@/components/teacher-panel";
 import { getTeacher } from "@/lib/auth";
@@ -14,6 +15,8 @@ import { createClient } from "@/lib/supabase/server";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const LESSON_COLUMNS = "id, title, class_name, topic, join_code, status, chatbot_enabled, room_name";
+// Özet yalnızca öğretmen sorgusuna girer; öğrenci tarafına hiç çekilmez.
+const TEACHER_COLUMNS = `${LESSON_COLUMNS}, summary, summary_updated_at`;
 
 type Lesson = {
   id: string;
@@ -24,6 +27,8 @@ type Lesson = {
   status: string;
   chatbot_enabled: boolean;
   room_name: string;
+  summary?: Summary | null;
+  summary_updated_at?: string | null;
 };
 
 export default function LivePage({ params }: PageProps<"/live/[lessonId]">) {
@@ -42,7 +47,7 @@ async function Live({ params }: { params: PageProps<"/live/[lessonId]">["params"
   const teacher = await getTeacher();
   if (teacher) {
     const supabase = await createClient();
-    const { data } = await supabase.from("lessons").select(LESSON_COLUMNS).eq("id", lessonId).maybeSingle();
+    const { data } = await supabase.from("lessons").select(TEACHER_COLUMNS).eq("id", lessonId).maybeSingle();
     if (data) return <TeacherView lesson={data} identity={`teacher:${teacher.id}`} />;
   }
 
@@ -88,16 +93,6 @@ function RoleBadge({ label }: { label: string }) {
 }
 
 async function TeacherView({ lesson, identity }: { lesson: Lesson; identity: string }) {
-  const supabase = await createClient();
-  // RLS: yalnızca bu dersin kartları. Öğretmen ham mesajı hiçbir yoldan göremez.
-  const { data: cards } = await supabase
-    .from("topic_cards")
-    .select("id, topic_label, summary_text, kind, distinct_session_count, is_read, has_update")
-    .eq("lesson_id", lesson.id)
-    .eq("status", "open")
-    .order("distinct_session_count", { ascending: false })
-    .order("updated_at", { ascending: false });
-
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-6 py-8">
       <header className="flex flex-wrap items-center justify-between gap-4">
@@ -134,7 +129,8 @@ async function TeacherView({ lesson, identity }: { lesson: Lesson; identity: str
 
         <TeacherPanel
           lessonId={lesson.id}
-          cards={cards ?? []}
+          summary={lesson.summary ?? null}
+          summaryUpdatedAt={lesson.summary_updated_at ?? null}
           chatbotEnabled={lesson.chatbot_enabled}
           isLive={lesson.status === "live"}
         />

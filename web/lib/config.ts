@@ -8,7 +8,8 @@ export const RATE_LIMITS = {
 } as const;
 
 export const ANALYSIS = {
-  maxBatch: 100, // bir turda AI'a gönderilecek en fazla mesaj
+  maxBatch: 100, // bir turda AI'a gönderilecek en fazla yeni mesaj
+  maxApproved: 300, // özet bağlamına giren en fazla onaylı mesaj (son "Cevaplandı"dan beri)
   staleRunMs: 2 * 60_000, // bu süreden eski "running" kaydı takılmış sayılır
   // Öğretmen paneli açıkken kendiliğinden analiz aralığı (n8n'den bağımsız). Varsayılan 5 dk.
   // NEXT_PUBLIC_AUTO_ANALYSIS_SECONDS: 30 gibi bir değer (en az 10 sn) aralığı değiştirir;
