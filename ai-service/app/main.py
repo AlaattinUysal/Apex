@@ -6,6 +6,7 @@ import logging
 from app.config import INTERNAL_API_KEY
 from app.models import AnalyzeBatchRequest, AnalyzeBatchResponse
 from app.gemini import analyze_batch_with_gemini
+from app.summary import router as summary_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("apex-ai-main")
@@ -35,6 +36,8 @@ def verify_token(credentials: HTTPAuthorizationCredentials = Security(security))
             detail="Geçersiz yetkilendirme anahtarı."
         )
     return True
+
+app.include_router(summary_router)  # POST /summarize-batch (tek özet kartı modeli)
 
 @app.get("/health")
 async def health_check():
