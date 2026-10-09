@@ -1,1 +1,0 @@
-reis n8n için json dosyası oluştur nir node her kullanıcı istek gönderdiğinde o mesajları tutucak diğer node 5 dakikada bir mesajları toplu şekilde yapay zeka ajanına ileticek yapay zeka ajanının promtu mesajları öğretmen için özetle uygunsuz mesajları görmezden gel yapay zeka api sinin döndüğü cevabıda döndürsün
