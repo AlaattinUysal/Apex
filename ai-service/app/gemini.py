@@ -5,7 +5,8 @@ import httpx
 from typing import Dict, Any, List
 
 from app.config import GEMINI_API_KEY, GEMINI_MODEL
-from app.models import AnalyzeBatchRequest, AnalyzeBatchResponse
+from app.models import AnalyzeBatchRequest, AnalyzeBatchResponse, MessageDecision
+from fastapi import HTTPException, status
 
 logger = logging.getLogger("gemini-service")
 
@@ -49,7 +50,7 @@ Sadece aşağıdaki JSON şemasına uygun geçerli bir JSON objesi döndür:
 """
 
 def generate_mock_response(request: AnalyzeBatchRequest) -> AnalyzeBatchResponse:
-    """Gemini anahtarı yoksa veya test modundaysa kurala uygun mock yanıt üretir."""
+    """Geliştirme / test modunda kurala uygun sahte yanıt üretir."""
     decisions = []
     new_cards = []
     new_card_counter = 1
@@ -57,21 +58,25 @@ def generate_mock_response(request: AnalyzeBatchRequest) -> AnalyzeBatchResponse
     for msg in request.messages:
         text_lower = msg.text.lower()
         if any(bad in text_lower for bad in ["aptal", "boş yapma", "salak", "küfür"]):
-            decisions.append({
-                "message_id": msg.message_id,
-                "decision": "reject",
-                "reject_reason": "abuse",
-                "card_ref": None
-            })
+            decisions.append(
+                MessageDecision(
+                    message_id=msg.message_id,
+                    decision="reject",
+                    reject_reason="abuse",
+                    card_ref=None
+                )
+            )
         else:
             if request.open_cards:
                 matched_card = request.open_cards[0].card_id
-                decisions.append({
-                    "message_id": msg.message_id,
-                    "decision": "deliver",
-                    "reject_reason": None,
-                    "card_ref": matched_card
-                })
+                decisions.append(
+                    MessageDecision(
+                        message_id=msg.message_id,
+                        decision="deliver",
+                        reject_reason=None,
+                        card_ref=matched_card
+                    )
+                )
             else:
                 card_ref = f"new:{new_card_counter}"
                 new_card_counter += 1
@@ -82,12 +87,14 @@ def generate_mock_response(request: AnalyzeBatchRequest) -> AnalyzeBatchResponse
                     "summary_text": msg.text[:60],
                     "kind": kind
                 })
-                decisions.append({
-                    "message_id": msg.message_id,
-                    "decision": "deliver",
-                    "reject_reason": None,
-                    "card_ref": card_ref
-                })
+                decisions.append(
+                    MessageDecision(
+                        message_id=msg.message_id,
+                        decision="deliver",
+                        reject_reason=None,
+                        card_ref=card_ref
+                    )
+                )
 
     return AnalyzeBatchResponse(
         messages=decisions,
@@ -97,8 +104,11 @@ def generate_mock_response(request: AnalyzeBatchRequest) -> AnalyzeBatchResponse
 
 async def analyze_batch_with_gemini(request: AnalyzeBatchRequest) -> AnalyzeBatchResponse:
     if not GEMINI_API_KEY or GEMINI_API_KEY == "BURAYA_GEMINI_API_KEY_GELECEK":
-        logger.warning("Geçerli bir GEMINI_API_KEY bulunamadı, mock yanıt dönülüyor.")
-        return generate_mock_response(request)
+        logger.error("Geçerli bir GEMINI_API_KEY bulunamadı.")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="GEMINI_API_KEY yapılandırılmamış veya eksik."
+        )
 
     if not request.messages:
         return AnalyzeBatchResponse(messages=[], new_cards=[], updated_cards=[])
@@ -119,55 +129,74 @@ async def analyze_batch_with_gemini(request: AnalyzeBatchRequest) -> AnalyzeBatc
         ],
         "generationConfig": {
             "temperature": 0.2,
-            "responseMimeType": "application/json"
+            "responseMimeType": "application/json",
+            "thinkingConfig": {
+                "thinkingBudget": 1024
+            }
         }
     }
 
-    # Model deneme sırası (Yedek modellerle birlikte)
-    candidate_models = [GEMINI_MODEL, "gemini-3.5-flash", "gemini-flash-latest"]
-    # Tekrarları temizle
-    candidate_models = list(dict.fromkeys(candidate_models))
+    # API anahtarı güvenliği: Key URL parametresinde DEĞİL, HTTP header'ında iletilir.
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
+    headers = {
+        "Content-Type": "application/json; charset=utf-8",
+        "x-goog-api-key": GEMINI_API_KEY
+    }
 
+    # Kota tasarrufu: En fazla 2 deneme (1 istek + 503 durumunda 1 retry)
     async with httpx.AsyncClient(timeout=35.0) as client:
         last_error = None
-        for model_name in candidate_models:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
-            for attempt in range(2):
-                try:
-                    response = await client.post(
-                        url,
-                        json=gemini_body,
-                        headers={"Content-Type": "application/json; charset=utf-8"}
+        for attempt in range(2):
+            try:
+                response = await client.post(
+                    url,
+                    json=gemini_body,
+                    headers=headers
+                )
+
+                if response.status_code == 503:
+                    logger.warning(f"Model {GEMINI_MODEL} 503 döndürdü, bekleniyor... (Deneme {attempt + 1}/2)")
+                    await asyncio.sleep(1.0)
+                    continue
+
+                if response.status_code != 200:
+                    logger.error(f"Gemini API hatası ({response.status_code}): {response.text}")
+                    raise HTTPException(
+                        status_code=status.HTTP_502_BAD_GATEWAY,
+                        detail=f"Gemini API hatası ({response.status_code}): {response.text[:200]}"
                     )
-                    if response.status_code == 503:
-                        logger.warning(f"Model {model_name} 503 döndürdü, bekleniyor... (Deneme {attempt+1})")
-                        await asyncio.sleep(1.0)
-                        continue
 
-                    response.raise_for_status()
-                    data = response.json()
-                    raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
-                    
-                    # Pydantic doğrulaması
-                    parsed = AnalyzeBatchResponse.model_validate_json(raw_text)
+                data = response.json()
+                raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
+                
+                # Pydantic doğrulaması
+                parsed = AnalyzeBatchResponse.model_validate_json(raw_text)
 
-                    # Eksik message_id kontrolü
-                    returned_ids = {m.message_id for m in parsed.messages}
-                    for m in request.messages:
-                        if m.message_id not in returned_ids:
-                            logger.warning(f"Eksik message_id ({m.message_id}) tespit edildi. Varsayılan reject ekleniyor.")
-                            parsed.messages.append({
-                                "message_id": m.message_id,
-                                "decision": "reject",
-                                "reject_reason": "unclear",
-                                "card_ref": None
-                            })
-                    return parsed
+                # Eksik message_id kontrolü (Pydantic MessageDecision modeli olarak eklenir)
+                returned_ids = {m.message_id for m in parsed.messages}
+                for m in request.messages:
+                    if m.message_id not in returned_ids:
+                        logger.warning(f"Eksik message_id ({m.message_id}) tespit edildi. Varsayılan reject ekleniyor.")
+                        parsed.messages.append(
+                            MessageDecision(
+                                message_id=m.message_id,
+                                decision="reject",
+                                reject_reason="unclear",
+                                card_ref=None
+                            )
+                        )
+                return parsed
 
-                except Exception as e:
-                    last_error = e
-                    logger.warning(f"Model {model_name} hatası: {e}")
-                    await asyncio.sleep(0.5)
+            except HTTPException:
+                raise
+            except Exception as e:
+                last_error = e
+                logger.warning(f"Gemini istek hatası (Deneme {attempt + 1}/2): {e}")
+                if attempt == 0:
+                    await asyncio.sleep(1.0)
 
-        logger.error(f"Tüm modeller denendi fakat başarısız oldu: {last_error}. Mock yanıt üretiliyor.")
-        return generate_mock_response(request)
+        logger.error(f"Gemini API başarısız oldu: {last_error}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Gemini servisine erişilemedi: {last_error}"
+        )
