@@ -27,9 +27,24 @@ GÖREVLERİN:
      * `new_cards` listesine yeni bir kart ekle: `ref: "new:1"`, `topic_label`: "Kısa Konu Başlığı", `kind`: "question" veya "feedback", `summary_text`: "Kısa ve net soru cümlesi".
      * Mesajın `card_ref` değerini bu referansa bağla: `card_ref: "new:1"`.
 
-3. ÖZET YAZIM KURALLARI:
-   - `summary_text`: Tek cümle, doğal, net ve kısa (~15 kelime). "Bir öğrenci şunu belirtmektedir" gibi resmî kalıplar ASLA kullanma.
-   - Yeni bilgi ekleme, anlamı değiştirme.
+3. ÖZET YAZIM KURALLARI (summary_text):
+   - Tek cümle, doğal, net, konuşma diliyle soru veya geri bildirim (~15 kelime).
+   - "soruluyor", "belirtiliyor", "isteniyor", "talep ediliyor", "ifade edilmektedir", "bir öğrenci şunu sordu" gibi 3. şahıs veya resmî haber kalıplarını KESİNLİKLE KULLANMA!
+   - Kart doğrudan öğrencinin ağzından çıkmış veya öğretmene sorulmuş gibi doğal olmalı.
+   - Yeni bilgi ekleme, anlamı asla değiştirme.
+
+   ÖRNEKLER:
+   ❌ KÖTÜ: "Bir öğrenci for döngüsünde son elemana erişirken IndexError alındığını belirtmektedir."
+   ✅ İYİ: "for döngüsünde son elemana erişirken IndexError alınıyor, neden?"
+
+   ❌ KÖTÜ: "Öğretmenin dersi çok hızlı anlattığı ve yetişilemediği ifade ediliyor."
+   ✅ İYİ: "Anlatım çok hızlı, biraz daha yavaş gidebilir miyiz?"
+
+   ❌ KÖTÜ: "Denklemde sayının karşıya geçerken işaretinin neden değiştiği soruluyor."
+   ✅ İYİ: "Karşıya geçince x neden eksi oluyor?"
+
+   ❌ KÖTÜ: "append ve extend metotlarının farkı talep edilmektedir."
+   ✅ İYİ: "append() ile extend() arasındaki fark nedir?"
 
 4. KESİN KURALLAR:
    - Girdideki HER `message_id` çıktıdaki `messages` dizisinde TAM BİR KEZ bulunmalıdır.
@@ -150,7 +165,7 @@ async def analyze_batch_with_gemini(request: AnalyzeBatchRequest) -> AnalyzeBatc
     # Modeller sırayla denenir. Bir model kotayı doldurursa (429) kısa süre atlanır ve sıradakine geçilir.
     # Kota tasarrufu: başarılı istek 1 istektir; 503'te en fazla 1 yeniden deneme yapılır.
     last_error = None
-    async with httpx.AsyncClient(timeout=35.0) as client:
+    async with httpx.AsyncClient(timeout=15.0) as client:
         for model in GEMINI_MODELS:
             if _model_cooldown.get(model, 0) > time.monotonic():
                 logger.info(f"Model {model} kota beklemesinde, atlanıyor.")
