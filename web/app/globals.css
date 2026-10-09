@@ -1,0 +1,58 @@
+@import "tailwindcss";
+
+:root {
+  --background: #fafaf9;
+  --foreground: #1c1917;
+  --muted: #78716c;
+  --border: #e7e5e4;
+  --card: #ffffff;
+  --accent: #4f46e5;
+  --accent-foreground: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0c0a09;
+    --foreground: #f5f5f4;
+    --muted: #a8a29e;
+    --border: #292524;
+    --card: #1c1917;
+    --accent: #818cf8;
+    --accent-foreground: #0c0a09;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-card: var(--card);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+@layer components {
+  .input {
+    @apply w-full rounded-lg border border-border bg-card px-3 py-2 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/30;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-foreground transition hover:opacity-90 disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center rounded-lg border border-border px-4 py-2 text-sm font-medium transition hover:bg-border/50 disabled:opacity-50;
+  }
+}
+
+/* Video üzerindeki katılımcı kimlik etiketini gizle (öğrenci/öğretmen kimliği görünmesin). */
+[data-lk-theme] .lk-participant-metadata {
+  display: none;
+}

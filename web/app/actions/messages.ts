@@ -1,0 +1,49 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { RATE_LIMITS } from "@/lib/config";
+import { getParticipantId } from "@/lib/participant";
+import { checkAndRecord } from "@/lib/rate-limit";
+import { createAdminClient } from "@/lib/supabase/admin";
+
+export type ChatState = { error?: string; sentAt?: number } | undefined;
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Öğrenci mesajı: doğrula -> rate limit -> 'queued' olarak kaydet. AI'a burada GİTMEZ;
+// 5 dakikalık analiz (tick) kuyruğu toplu işler.
+export async function sendMessage(_: ChatState, formData: FormData): Promise<ChatState> {
+  const lessonId = String(formData.get("lesson_id") ?? "");
+  const text = String(formData.get("text") ?? "").trim();
+
+  if (!UUID.test(lessonId)) return { error: "Geçersiz ders." };
+  if (!text) return { error: "Mesaj boş olamaz." };
+  if (text.length > RATE_LIMITS.maxChars) {
+    return { error: `Mesaj en fazla ${RATE_LIMITS.maxChars} karakter olabilir.` };
+  }
+
+  // Kimlik: çerezdeki anonim token. İstemciden gelen hiçbir kimlik bilgisine güvenilmez.
+  const participantId = await getParticipantId(lessonId);
+  if (!participantId) return { error: "Oturumun sona ermiş. Kodla yeniden katıl." };
+
+  const admin = createAdminClient();
+  const { data: lesson } = await admin
+    .from("lessons")
+    .select("status, chatbot_enabled")
+    .eq("id", lessonId)
+    .maybeSingle();
+
+  if (!lesson || lesson.status !== "live") return { error: "Ders şu an canlı değil." };
+  if (!lesson.chatbot_enabled) return { error: "Öğretmen şu an yeni soru almıyor." };
+
+  const limited = checkAndRecord(`${lessonId}:${participantId}`, text);
+  if (limited) return { error: limited };
+
+  const { error } = await admin
+    .from("student_messages")
+    .insert({ lesson_id: lessonId, participant_id: participantId, original_text: text });
+  if (error) return { error: "Mesaj gönderilemedi, tekrar dene." };
+
+  revalidatePath(`/live/${lessonId}`);
+  return { sentAt: Date.now() };
+}
