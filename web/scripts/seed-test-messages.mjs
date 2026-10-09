@@ -71,10 +71,14 @@ const { data: participants, error: pErr } = await admin
   .select("id");
 if (pErr) throw pErr;
 
+// Tek INSERT'te tüm satırlar aynı created_at'i alır; sıra belirsiz kalmasın diye mesajlar
+// dosyadaki sırayla, saniye aralıklı zaman damgasıyla eklenir (gerçek sohbet gibi).
+const start = Date.now() - messages.length * 1000;
 const rows = messages.map((text, i) => ({
   lesson_id: lesson.id,
   participant_id: participants[i % studentCount].id,
   original_text: text,
+  created_at: new Date(start + i * 1000).toISOString(),
 }));
 const { error: mErr } = await admin.from("student_messages").insert(rows);
 if (mErr) throw mErr;
