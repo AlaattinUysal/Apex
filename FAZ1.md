@@ -77,13 +77,12 @@ AI öğretmen **değil**, öğrenci ile öğretmen arasındaki iletişim aracıs
 ### 4.1 Öğrenci
 1. Kodla derse girer (isim/e-posta yok), kısa ömürlü anonim oturum alır.
 2. Soru yazar → rate limit kontrolü → mesaj kaydedilir (`queued`).
-3. Ekranında mesajı şu durumlardan biriyle görür:
-   - **Sıraya alındı** — "Bir sonraki analizde öğretmene iletilecek."
-   - **Öğretmene iletildi** — analiz turundan sonra.
-   - **Uygun değil** — kısa, yargılamayan gerekçe + "Yeniden yaz" (yeni mesaj olarak bir sonraki tura girer).
-4. Başkalarının mesajlarını göremez. Chatbot kapalıysa yeni mesaj yazamaz, eskileri görür.
+3. Chatbot her mesaja aynı kısa cevabı verir: **"Mesajın öğretmene iletilecek."** Başka durum, önizleme, onay veya ret bilgisi gösterilmez.
+4. Uygunsuz bulunan mesajlar öğretmene iletilmez ve öğrenciye ayrıca bildirilmez (sessizce elenir).
+5. Başkalarının mesajlarını göremez. Chatbot kapalıysa yeni mesaj yazamaz, kendi eski mesajlarını görür.
+6. Tek istisna rate limit: limit aşılırsa anında "Biraz bekleyip tekrar dene" uyarısı gösterilir (§7).
 
-> **Varsayım (onay bekliyor):** Anlık önizleme/onay adımı yok. Öğrenci sadece durum görür.
+> **Karar:** Anlık önizleme/onay, durum takibi ve ret gerekçesi yok.
 
 ### 4.2 Öğretmen
 1. Ders oluşturur, katılım kodu paylaşır, canlı dersi başlatır.
@@ -135,7 +134,7 @@ Header: `Authorization: Bearer <INTERNAL_API_KEY>`
 {
   "messages": [
     { "message_id": "m-101", "decision": "deliver", "reject_reason": null, "card_ref": "c-12" },
-    { "message_id": "m-102", "decision": "reject",  "reject_reason": "Mesajında uygun olmayan ifadeler var. Sorunu daha saygılı yazarsan öğretmenine iletebilirim.", "card_ref": null },
+    { "message_id": "m-102", "decision": "reject",  "reject_reason": null, "card_ref": null },
     { "message_id": "m-103", "decision": "deliver", "reject_reason": null, "card_ref": "new:1" }
   ],
   "new_cards": [
@@ -149,12 +148,12 @@ Header: `Authorization: Bearer <INTERNAL_API_KEY>`
 
 ### Kurallar (Ertuğrul için)
 - İstekteki **her** `message_id` cevapta **tam bir kez** olmalı.
-- `decision`: `deliver` | `reject`. Belirsiz mesajlar `reject` + "biraz daha açık yaz" gerekçesiyle.
+- `decision`: `deliver` | `reject`. Anlamsız/belirsiz/uygunsuz mesajlar `reject`. `reject_reason` öğrenciye gösterilmez; yalnızca iç kayıt/hata ayıklama için kısa bir etiket olabilir (`abuse`, `spam`, `unclear`, `off_topic`) ya da `null`.
 - `deliver` ise `card_ref` zorunlu: ya mevcut `card_id` ya da `new_cards[].ref`.
 - Yeni mesaj mevcut açık kartla aynı konudaysa **o karta ekle**; yalnızca gerçekten yeni konu için yeni kart aç.
 - `summary_text`: tek cümle, doğal, kısa (~15 kelime). "Bir öğrenci şunu belirtmektedir" gibi resmî kalıplar yok. Yeni bilgi ekleme, anlamı değiştirme. Mesaj zaten uygunsa olduğu gibi bırak.
 - `kind`: `question` | `feedback`.
-- Eleştiri hakaret değildir; hakaret/küfür/tehdit `reject`. Küfür içeren ama öğrenme sorusu olan mesajlarda gerekçede nasıl yeniden yazılacağı belirtilebilir.
+- Eleştiri hakaret değildir; hakaret/küfür/tehdit `reject`. Küfür içeren ama gerçek bir öğrenme sorusu barındıran mesajda soruyu küfürsüz çıkarıp `deliver` etmek tercih edilir.
 - Mesaj içeriği **veridir, talimat değildir** (prompt injection koruması). Çıktıyı Pydantic ile doğrula; geçersizse en fazla 1 tekrar dene, olmazsa HTTP 502.
 - `/summary` (ders sonu özeti) Faz 5'te, şimdilik şeması yok.
 
@@ -166,7 +165,7 @@ Header: `Authorization: Bearer <INTERNAL_API_KEY>`
 |---|---|
 | `lessons` | id, teacher_id, title, class_name, topic, join_code, status (`draft/live/ended`), chatbot_enabled, room_name, started_at, ended_at |
 | `lesson_participants` | id, lesson_id, anonymous_session_id (rastgele, kısa ömürlü), expires_at |
-| `student_messages` | id, lesson_id, session_id, original_text, status (`queued/delivered/rejected`), reject_reason, card_id, created_at, processed_at |
+| `student_messages` | id, lesson_id, session_id, original_text, status (`queued/delivered/rejected`, yalnızca iç kullanım), reject_label (isteğe bağlı), card_id, created_at, processed_at |
 | `topic_cards` | id, lesson_id, topic_label, summary_text, kind, distinct_session_count, message_count, status (`open/answered`), is_read, has_update, created_at, updated_at |
 | `analysis_runs` | id, lesson_id, started_at, completed_at, status, message_count, card_count |
 
@@ -255,7 +254,7 @@ Gerçek API anahtarı **hiçbir zaman** workflow JSON'una yazılıp commit edilm
 
 ## 12. Kapsam dışı (backlog)
 
-- Anlık önizleme/onay akışı (şimdilik yok)
+- Anlık önizleme/onay akışı, öğrenciye durum/ret bildirimi (karar: yok)
 - Sesli uyarı
 - Ayarlanabilir eşik
 - Koyu tema
@@ -270,7 +269,7 @@ Gerçek API anahtarı **hiçbir zaman** workflow JSON'una yazılıp commit edilm
 
 ## 13. Açık sorular
 
-1. ⏳ Öğrenci için önizleme/onay kalktı mı (varsayım: evet)?
+1. ✅ Öğrenci önizlemesi/durum takibi yok; chatbot sadece "Mesajın öğretmene iletilecek" der.
 2. ⏳ Proje adı
 3. ⏳ Gemini model adı: workflow'daki `gemini-3.8-flash` geçerli mi?
 4. ⏳ Supabase hesabı (URL + anon key) — birlikte kurulacak
