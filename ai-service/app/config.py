@@ -11,5 +11,9 @@ GEMINI_MODELS = [
     if m.strip()
 ]
 GEMINI_MODEL = GEMINI_MODELS[0]  # eski ad, uyumluluk için
-INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "apex-internal-secret-key-2026")
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "").strip()
+if not INTERNAL_API_KEY:
+    raise RuntimeError("HATA: INTERNAL_API_KEY ortam değişkeni tanımlanmamış. Güvenlik için servis başlatılamıyor.")
+
 PORT = int(os.getenv("PORT", "8000"))
+
