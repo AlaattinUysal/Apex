@@ -6,6 +6,10 @@ export const RATE_LIMITS = {
   duplicateWindowMs: 60_000, // aynı metin bu süre içinde tekrar kabul edilmez
 } as const;
 
+export const TIMEOUT_RULES = {
+  abuseSpamBanMs: 5 * 60 * 1000, // abuse ve spam yapan öğrenci 5 dakika boyunca chati kullanamaz
+} as const;
+
 export const ANALYSIS = {
   maxBatch: 100, // bir turda AI'a gönderilecek en fazla yeni mesaj
   maxApproved: 300, // özet bağlamına giren en fazla onaylı mesaj (son "Cevaplandı"dan beri)

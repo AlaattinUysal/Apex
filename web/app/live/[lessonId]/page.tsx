@@ -7,6 +7,7 @@ import { LiveRoom } from "@/components/live-room";
 import type { Summary } from "@/lib/ai-client";
 import { StudentChat } from "@/components/student-chat";
 import { TeacherPanel } from "@/components/teacher-panel";
+import { TIMEOUT_RULES } from "@/lib/config";
 import { getTeacher } from "@/lib/auth";
 import { createRoomToken, isLiveKitConfigured, type LiveRole } from "@/lib/livekit";
 import { getParticipantId } from "@/lib/participant";
@@ -140,12 +141,32 @@ async function TeacherView({ lesson, identity }: { lesson: Lesson; identity: str
 }
 
 async function StudentView({ lesson, participantId }: { lesson: Lesson; participantId: string }) {
+  const admin = createAdminClient();
+
   // Öğrenci yalnızca KENDİ mesajlarını görür (başkalarınınkini değil); durum/ret bilgisi gösterilmez.
-  const { data: messages } = await createAdminClient()
+  const { data: messages } = await admin
     .from("student_messages")
     .select("id, original_text")
     .eq("participant_id", participantId)
     .order("created_at");
+
+  // Abuse veya spam nedeniyle 5 dakikalık kısıtlama kontrolü
+  const banCutoff = new Date(Date.now() - TIMEOUT_RULES.abuseSpamBanMs).toISOString();
+  const { data: recentBan } = await admin
+    .from("student_messages")
+    .select("processed_at")
+    .eq("lesson_id", lesson.id)
+    .eq("participant_id", participantId)
+    .eq("status", "rejected")
+    .in("reject_label", ["abuse", "spam"])
+    .gt("processed_at", banCutoff)
+    .order("processed_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const banUntil = recentBan?.processed_at
+    ? new Date(recentBan.processed_at).getTime() + TIMEOUT_RULES.abuseSpamBanMs
+    : null;
 
   // Soru alımı kapalıyken kutu BİLEREK kapatılmaz: reddetme yalnızca sunucuda yapılır
   // (öğretmen kapatınca açık kalmış sayfalar da aynı şekilde reddedilir). Yalnızca ders canlı değilse kapalı.
@@ -177,6 +198,7 @@ async function StudentView({ lesson, participantId }: { lesson: Lesson; particip
             lessonId={lesson.id}
             messages={(messages ?? []).map((m) => ({ id: m.id, text: m.original_text }))}
             blockedReason={blockedReason}
+            banUntil={banUntil}
           />
         </aside>
       </div>
