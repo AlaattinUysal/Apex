@@ -35,3 +35,6 @@ docker-compose.override.yml
 # OS files
 .DS_Store
 Thumbs.db
+
+# Python şablonundaki "lib/" deseni web/lib (Next.js kaynak klasörü) dosyalarını da yok sayıyordu.
+!web/lib/
