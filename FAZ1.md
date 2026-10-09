@@ -1,211 +1,276 @@
-# [PROJE ADI BELİRLENECEK] — FAZ 1 (Taslak, tartışmaya açık)
+# [PROJE ADI BELİRLENECEK] — FAZ 1 (Taslak v2, tartışmaya açık)
 
-> Kaynak: `writing-block.md` (tam vizyon) + Ertuğrul'un mevcut `docker/` çalışması (n8n).
-> Bu dosya kodlamaya başlamadan önce **iş bölümünü ve sözleşmeyi** netleştirmek içindir.
+> Kaynak: `writing-block.md` (ilk vizyon) + Ertuğrul'un n8n/Gemini çalışması + bizim sonraki kararlarımız.
+> **Bu sürüm "5 dakikalık toplu analiz" modeline göre yazıldı.** `writing-block.md`'deki anlık önizleme/onay akışı, sesli uyarı ve "3 öğrenci eşiği" kaldırıldı.
 
 ---
 
 ## 1. Tek cümlede proje
 
-Öğrenci ders sırasında anonim soru yazar → AI küfür/hakaret kontrolü yapıp gerekirse kısaltır → öğrenci onaylar → öğretmen paneline düşer → AI her 5 dk'da benzer soruları gruplayıp "ortak sorun" uyarısı verir → ders sonu rapor.
+Öğrenci ders sırasında anonim soru yazar. Mesajlar 5 dakika boyunca birikir; her 5 dakikada AI hepsini bir seferde inceler: uygunsuzları eler, benzer olanları **konuya göre birleştirir** ve her konu için **kısa, düzenlenmiş tek bir soru** üretir. Öğretmen panelinde ham mesaj değil, **konu kartları** görünür. 15 öğrenci 7 konuda soru sorduysa öğretmen 7 kart görür.
 
-AI öğretmen **değil**, öğrenci ile öğretmen arasındaki **iletişim aracısı**.
+AI öğretmen **değil**, öğrenci ile öğretmen arasındaki iletişim aracısı.
+
+### Ürün kuralları
+- Öğretmen **hiçbir ham mesaj görmez**, yalnızca AI'ın özetlediği kartları görür. Öğrencinin kim olduğunu bilemez.
+- Kartlar kısa ve doğal olmalı (tek cümle, ~15 kelime). Öğretmen uzun metin okumaz.
+- AI **anlamı değiştirmez, yeni bilgi eklemez**, yapıcı eleştiriyi sansürlemez ("Anlatım çok hızlı" bir kart olabilir). Hakaret/küfür içeren mesaj öğretmene **gitmez**.
+- **Sesli bildirim yok.** Sadece görsel: kırmızı rozet (okunmamış kart sayısı), kart listesi.
+- Öğretmen kart paneli istediği zaman açıp kapatabilir; bildirim biriken kartlar rozette durur.
+- **Eşik yok:** tek öğrencinin sorusu da kart olur. Kartta "N öğrenci" yazar, çok öğrenciye ait olanlar üstte sıralanır.
+- Aynı konu sonraki turlarda tekrar gelirse AI yeni mesajları **mevcut açık karta ekler** (kart sayısı küçük kalır). Öğretmen 15 dk bakmasa bile kart sayısı şişmez.
 
 ---
 
 ## 2. Rol / sahiplik ayrımı
 
-Çakışmayı önlemek için ayrım **klasör ve servis sınırıyla** yapılıyor: kimse diğerinin klasörüne commit atmaz.
+Çakışmayı önlemek için ayrım **klasör ve servis sınırıyla**: kimse diğerinin klasörüne commit atmaz.
 
-| | **Alaaddin — Web / Platform** | **Ertuğrul — AI / Video / Altyapı** |
+| | **Alaaddin — Web / Platform / Video** | **Ertuğrul — AI / n8n** |
 |---|---|---|
-| Klasör | `web/` (Next.js), `livekit/` (video altyapısı) | `ai-service/`, `docker/` (n8n) |
-| Sahip olduğu servis | Next.js uygulaması, Supabase (DB, Auth, Realtime, RLS), **LiveKit (sunucu + token + React bileşeni — video komple Alaaddin'de)** | AI servisi (Python/FastAPI, **Gemini**), n8n zamanlayıcı workflow'u |
-| Ürün özellikleri | Landing, öğretmen girişi, ders oluşturma/katılım kodu, rol bazlı arayüzler, canlı video, öğrenci chat paneli, öğretmen soru paneli, bildirim rozeti, chatbot aç/kapat, rapor ve zaman çizelgesi ekranları, anonim oturum + yetkilendirme, 5 dk analiz orkestrasyonu | Mesaj moderasyonu, mesaj sadeleştirme, konu/kavram sınıflandırma, ortak sorun kümeleme, rapor özeti üretimi, prompt kalitesi / chatbot iyileştirme, n8n akışı |
-| Veritabanı | **Tek sahip: Alaaddin** (şema, migration, RLS). AI servisi veritabanına **hiç erişmez** | Yok (AI servisi stateless: girdi alır, JSON döner) |
-| Env / sırlar | Supabase + LiveKit anahtarları | Gemini anahtarı (sadece AI servisinde) |
+| Klasör | `web/` (Next.js), `livekit/` | `ai-service/`, `docker/` |
+| Servisler | Next.js, Supabase (DB, Auth, Realtime, RLS), LiveKit (sunucu + token + React bileşeni) | AI servisi (Python/FastAPI, **Gemini**), n8n 5 dk zamanlayıcı |
+| Ürün | Landing, giriş, ders oluşturma/kod, öğrenci ve öğretmen arayüzleri, canlı video, rate limit, anonim oturum, tick orkestrasyonu, kart paneli, rozet, chatbot aç/kapat | `/analyze-batch`: moderasyon + gruplama + kısa soru üretimi, prompt kalitesi, ders sonu özeti (`/summary`) |
+| Veritabanı | **Tek sahip** (şema, migration, RLS) | Erişimi yok. AI servisi stateless |
+| Sırlar | Supabase + LiveKit anahtarları | Gemini anahtarı (sadece AI servisinde) |
 
-**Altın kural:** Tarayıcı AI servisini asla doğrudan çağırmaz. Her şey `Next.js → AI servisi` yönünde gider. API anahtarı istemciye çıkmaz.
+**Altın kural:** Tarayıcı AI servisini asla çağırmaz. Her şey `Next.js → AI servisi`. API anahtarı istemciye çıkmaz.
 
 ---
 
-## 3. Mimari (sade MVP)
+## 3. Mimari
 
 ```
  Tarayıcı (öğretmen / öğrenci)
-      │                    │
-      │ HTTP + Realtime    │ WebRTC
-      ▼                    ▼
- ┌───────────────┐    ┌──────────────┐
- │ Next.js (web) │    │ LiveKit      │  ← Ertuğrul
- │ + Supabase    │    │ (docker)     │
- └──────┬────────┘    └──────────────┘
-        │ HTTP (sunucudan sunucuya)
-        ▼
+      │ HTTP + Realtime        │ WebRTC
+      ▼                        ▼
+ ┌───────────────┐        ┌───────────┐
+ │ Next.js (web) │        │ LiveKit   │
+ │  + Supabase   │        └───────────┘
+ └──┬──────────┬─┘
+    │          ▲ POST /api/internal/analysis/tick  (5 dk'da bir)
+    │          │
+    │       ┌──┴──────┐
+    │       │  n8n    │   (sadece zamanlayıcı)
+    │       └─────────┘
+    │ HTTP (sunucudan sunucuya)
+    ▼
  ┌─────────────────────────────┐
- │ AI servisi (Python/FastAPI) │  ← Ertuğrul
- │  /moderate  /cluster  ...   │
- │  (n8n: 5 dk zamanlayıcı)    │
+ │ AI servisi (Python/FastAPI) │──► Gemini
+ │  POST /analyze-batch        │
  └─────────────────────────────┘
 ```
 
-### 3.1 Karar: AI Python'da (Seçenek A, onaylandı)
-
-| Parça | Nerede çalışır | Ne yapar |
+| Parça | Nerede | Ne yapar |
 |---|---|---|
-| Gemini çağrıları (moderasyon, sadeleştirme, konu etiketi, kümeleme) | **Python / FastAPI** (`ai-service/`) | İstek alır, Gemini'ye sorar, doğrulanmış JSON döner. Veritabanına erişmez. |
-| Mesaj kuyruğu / durum | **Supabase** (`student_messages` tablosu) | Dosya kuyruğu yok; "kuyruk" artık tablodaki onaylı mesajlar. |
-| Orkestrasyon (kimi ne zaman analiz et, sonucu kaydet, bildirim üret) | **Next.js** (`/api/...`) | AI servisini çağırır, sonucu Supabase'e yazar. |
-| 5 dk zamanlayıcı | **n8n** | Sadece Next.js'teki `tick` endpoint'ini çağırır. |
+| Gemini çağrıları | Python/FastAPI | İstek alır, doğrulanmış JSON döner, veritabanını görmez |
+| Mesaj kuyruğu | Supabase (`student_messages`, durum `queued`) | Dosya kuyruğu yok |
+| Orkestrasyon (`tick`) | Next.js | Kuyruğu çeker, AI'ı çağırır, sonucu kaydeder |
+| Zamanlayıcı | n8n | Sadece `tick` endpoint'ini çağırır |
 
-Neden: iki kişi aynı koda dokunmadan çalışır, prompt kalitesi bağımsız iyileştirilir, mantık tek yerde (Python) olduğu için test edilebilir.
+**Neden Python:** iki kişi aynı koda dokunmaz, prompt bağımsız iyileştirilir, mantık tek yerde ve test edilebilir.
 
-### 3.2 Ertuğrul'un mevcut n8n işi ne olacak
+---
+
+## 4. Akışlar
+
+### 4.1 Öğrenci
+1. Kodla derse girer (isim/e-posta yok), kısa ömürlü anonim oturum alır.
+2. Soru yazar → rate limit kontrolü → mesaj kaydedilir (`queued`).
+3. Ekranında mesajı şu durumlardan biriyle görür:
+   - **Sıraya alındı** — "Bir sonraki analizde öğretmene iletilecek."
+   - **Öğretmene iletildi** — analiz turundan sonra.
+   - **Uygun değil** — kısa, yargılamayan gerekçe + "Yeniden yaz" (yeni mesaj olarak bir sonraki tura girer).
+4. Başkalarının mesajlarını göremez. Chatbot kapalıysa yeni mesaj yazamaz, eskileri görür.
+
+> **Varsayım (onay bekliyor):** Anlık önizleme/onay adımı yok. Öğrenci sadece durum görür.
+
+### 4.2 Öğretmen
+1. Ders oluşturur, katılım kodu paylaşır, canlı dersi başlatır.
+2. Panel ("Gelen Sorular") kartları listeler. Kart: **kısa soru**, konu etiketi, **N öğrenci**, son güncelleme saati.
+3. Sıralama: öğrenci sayısı (azalan), sonra güncelleme zamanı.
+4. Rozet = okunmamış veya güncellenmiş kart sayısı.
+5. Karta tıklayınca okundu, "Cevaplandı" ile kart kapanır. (Öğrencilere bildirim gitmez, öğrenci dersi zaten izliyor.)
+6. Chatbotu açıp kapatabilir. Kapalıyken öğrenciler yeni mesaj gönderemez.
+
+### 4.3 5 dakikalık analiz (`tick`)
+Her canlı ders için:
+1. `queued` mesajları çek (yeni gelenler).
+2. **Açık kartları** çek (`status = open`): `card_id`, konu etiketi, mevcut kısa soru.
+3. AI'a gönder: `POST /analyze-batch` (yalnızca metin ve id'ler; **oturum kimliği AI'a gitmez**).
+4. Cevaba göre:
+   - Uygun mesajlar → `delivered`, ilgili karta bağlanır.
+   - Uygun olmayanlar → `rejected` + gerekçe.
+   - Yeni konular → yeni kart.
+   - Mevcut karta eklenenler → kartın `distinct_session_count` ve `message_count`'u yeniden hesaplanır (benzersiz oturum sayısı, aynı öğrenci 10 kez sorsa 1), `updated_at` güncellenir, kart daha önce okunmuşsa tekrar "güncellendi" (okunmamış) olur.
+   - AI kartın kısa sorusunu yeniden yazmayı önerdiyse güncellenir.
+5. Realtime ile öğretmen paneline yansır. Tur `analysis_runs`'a kaydedilir.
+6. AI hata verirse mesajlar `queued` kalır, bir sonraki turda tekrar denenir.
+
+Demo için "Analizi şimdi çalıştır" butonu **aynı `tick` kodunu** çağırır (n8n'e bağımlı değiliz).
+
+---
+
+## 5. SÖZLEŞME: `POST /analyze-batch`
+
+Header: `Authorization: Bearer <INTERNAL_API_KEY>`
+
+### İstek
+```json
+{
+  "lesson": { "subject": "Matematik", "topic": "Denklemler" },
+  "open_cards": [
+    { "card_id": "c-12", "topic_label": "İşaret değişimi", "summary_text": "Karşıya geçince işaret neden değişiyor?" }
+  ],
+  "messages": [
+    { "message_id": "m-101", "text": "Hocam bu x niye eksi oldu anlamadım" },
+    { "message_id": "m-102", "text": "Hoca aptal bir şey anlatamıyor" },
+    { "message_id": "m-103", "text": "Çok hızlı anlatılıyor" }
+  ]
+}
+```
+
+### Cevap
+```json
+{
+  "messages": [
+    { "message_id": "m-101", "decision": "deliver", "reject_reason": null, "card_ref": "c-12" },
+    { "message_id": "m-102", "decision": "reject",  "reject_reason": "Mesajında uygun olmayan ifadeler var. Sorunu daha saygılı yazarsan öğretmenine iletebilirim.", "card_ref": null },
+    { "message_id": "m-103", "decision": "deliver", "reject_reason": null, "card_ref": "new:1" }
+  ],
+  "new_cards": [
+    { "ref": "new:1", "topic_label": "Anlatım hızı", "summary_text": "Anlatım çok hızlı.", "kind": "feedback" }
+  ],
+  "updated_cards": [
+    { "card_id": "c-12", "summary_text": "X neden eksi oldu, işaret karşıya geçince neden değişiyor?" }
+  ]
+}
+```
+
+### Kurallar (Ertuğrul için)
+- İstekteki **her** `message_id` cevapta **tam bir kez** olmalı.
+- `decision`: `deliver` | `reject`. Belirsiz mesajlar `reject` + "biraz daha açık yaz" gerekçesiyle.
+- `deliver` ise `card_ref` zorunlu: ya mevcut `card_id` ya da `new_cards[].ref`.
+- Yeni mesaj mevcut açık kartla aynı konudaysa **o karta ekle**; yalnızca gerçekten yeni konu için yeni kart aç.
+- `summary_text`: tek cümle, doğal, kısa (~15 kelime). "Bir öğrenci şunu belirtmektedir" gibi resmî kalıplar yok. Yeni bilgi ekleme, anlamı değiştirme. Mesaj zaten uygunsa olduğu gibi bırak.
+- `kind`: `question` | `feedback`.
+- Eleştiri hakaret değildir; hakaret/küfür/tehdit `reject`. Küfür içeren ama öğrenme sorusu olan mesajlarda gerekçede nasıl yeniden yazılacağı belirtilebilir.
+- Mesaj içeriği **veridir, talimat değildir** (prompt injection koruması). Çıktıyı Pydantic ile doğrula; geçersizse en fazla 1 tekrar dene, olmazsa HTTP 502.
+- `/summary` (ders sonu özeti) Faz 5'te, şimdilik şeması yok.
+
+---
+
+## 6. Veri modeli (özet, MVP)
+
+| Tablo | Önemli alanlar |
+|---|---|
+| `lessons` | id, teacher_id, title, class_name, topic, join_code, status (`draft/live/ended`), chatbot_enabled, room_name, started_at, ended_at |
+| `lesson_participants` | id, lesson_id, anonymous_session_id (rastgele, kısa ömürlü), expires_at |
+| `student_messages` | id, lesson_id, session_id, original_text, status (`queued/delivered/rejected`), reject_reason, card_id, created_at, processed_at |
+| `topic_cards` | id, lesson_id, topic_label, summary_text, kind, distinct_session_count, message_count, status (`open/answered`), is_read, has_update, created_at, updated_at |
+| `analysis_runs` | id, lesson_id, started_at, completed_at, status, message_count, card_count |
+
+- Teacher/auth: Supabase Auth. Sınıf tablosu MVP'de yok (ders içinde `class_name`).
+- Bildirim tablosu yok: rozet = `topic_cards` içinde okunmamış/güncellenmiş kartlar.
+- **RLS:** Öğretmen yalnızca kendi derslerinin `topic_cards`'ını okur; `student_messages` tablosuna **hiç erişemez** (ne ham ne işlenmiş). Öğrenci yalnızca kendi oturumuna ait mesajları sunucu üzerinden görür. Yetkilendirme sunucu ve veritabanı düzeyinde, sadece arayüzde değil.
+
+---
+
+## 7. Rate limit (taslak, hepsi Next.js'te, AI'a gitmeden önce)
+
+- Oturum başına dakikada en fazla **6 mesaj**, ders başına en fazla **30 mesaj**
+- Mesaj en fazla **500 karakter**
+- Aynı oturumdan **60 sn içinde aynı metin** tekrar kabul edilmez
+- Aşılınca öğrenciye anlaşılır Türkçe uyarı
+- MVP'de bellek içi sayaç, sayılar tek `config` dosyasında sabit
+- Bu, Gemini kotasını da korur
+
+---
+
+## 8. FAZ 1 kapsamı
+
+Hedef: **"Öğretmen ders açar, öğrenci kodla girer, iki ayrı arayüz görünür; AI servisi sözleşmeyle sahte (mock) cevap verir."**
+
+### Alaaddin (`web/`)
+1. Next.js 16 + TypeScript + Tailwind kurulumu ✅ (`web/` iskeleti hazır)
+2. `.gitignore`/`.env.example`, Supabase projesi (birlikte kurulacak), şema + RLS taslağı
+3. Landing (`/`), öğretmen girişi, ders oluşturma, katılım kodu, `/join`, anonim oturum
+4. `/live/[lessonId]` iskeleti: rol bazlı sağ panel (öğrenci: "Sorularım", öğretmen: "Gelen Sorular"), video yer tutucusu
+5. AI adapter katmanı (`lib/ai-client.ts`) mock sunucuya karşı
+
+### Ertuğrul (`ai-service/`, `docker/`)
+1. FastAPI iskeleti: `POST /analyze-batch` **sabit sahte cevapla** ayakta (§5 şemasına uygun)
+2. Gemini'yi tek bir `provider` arayüzü arkasında bağla, kendi prompt'larını (özetleme, uygunsuz eleme) buraya taşı
+3. `main.py` → anonim test istemcisi (öğrenci adı yok), örnek batch'leri `/analyze-batch`'e gönderir
+4. `docker-compose`'a AI servisini ekle, `.env.example`, README
+5. n8n: sadece 5 dk zamanlayıcı → `POST {WEB_URL}/api/internal/analysis/tick` (Docker içinden `host.docker.internal:3000`), dosya kuyruğu ve HTML rapor kalkar
+
+### Faz 1 bitiş kriteri
+- [ ] Ders oluşturulup kodla ikinci tarayıcıdan öğrenci girişi, iki farklı panel
+- [ ] Next.js `/analyze-batch`'e istek atıp mock cevabı alıyor
+- [ ] n8n `tick` endpoint'ini çağırabiliyor (boş sonuç olsa da)
+
+---
+
+## 9. Ertuğrul'un mevcut işi ne olacak
 
 | Mevcut parça | Karar |
 |---|---|
-| Gemini prompt metinleri (özetleme, uygunsuz mesajı eleme) | **Python'a taşınır** (`/moderate`, `/cluster`, `/summary` prompt'larına temel olur) |
+| Gemini prompt metinleri (uygunsuzları ele, özetle) | **Python'a taşınır**, `/analyze-batch` prompt'unun temeli olur |
 | n8n içindeki Gemini HTTP çağrısı | Kalkar (Python yapar) |
-| Dosya kuyruğu (`bekleyen_mesajlar.json`), "Mesajı Kuyruğa Kaydet" | Kalkar (Supabase tablosu) |
-| 5 dk (şu an 30 sn) zamanlayıcı + Manuel Tetikle | **Kalır**, sadece `tick` çağrısı yapacak şekilde sadeleşir |
-| HTML rapor + `GET /ozet` | Kalkar (rapor Next.js'te) |
-| `main.py` test paneli | **Kalır**, Python endpoint'lerini test eden istemciye dönüşür (anonim; öğrenci adı yok) |
-| `docker-compose.yml` (n8n) | Kalır, AI servisi eklenir |
-| `NODE_FUNCTION_ALLOW_*` ayarları | `fs` kullanımı kalkınca gerekmez |
-| Türkçe karakter düzeltme tablosu | UTF-8 ile gönderilince gerekmez; gerekirse kaynağı (`.bat`) düzeltilir |
+| Dosya kuyruğu `bekleyen_mesajlar.json` | Kalkar (Supabase `queued` mesajları) |
+| Zamanlayıcı (30 sn test) + Manuel Tetikle | **Kalır**, 5 dk'ya alınır, sadece `tick` çağırır |
+| HTML rapor + `GET /ozet` | Kalkar (kartlar Next.js'te) |
+| `main.py` test paneli | **Kalır**, anonim test istemcisine dönüşür |
+| `NODE_FUNCTION_ALLOW_*` | `fs` kalkınca gerekmez |
+| Karakter düzeltme tablosu | UTF-8 ile gönderilince gerekmez |
 
-- Gerçek API anahtarı hiçbir zaman workflow JSON'una yazılıp commit edilmez (`.env` kullanılır).
-
-- Gerçek zamanlılık Supabase Realtime ile (Next.js tarafı, Alaaddin).
-- 5 dk'lık analizi tetikleyen zamanlayıcı n8n'de (Ertuğrul); n8n analiz sonucunu Next.js'in "internal" endpoint'ine veya doğrudan Supabase'e yazar (karar bekliyor, §6-3).
-- Video token'ı: Ertuğrul'un servisi üretir, Next.js `/live` sayfası ister.
+Gerçek API anahtarı **hiçbir zaman** workflow JSON'una yazılıp commit edilmez (`.env`).
 
 ---
 
-## 4. İki taraf arası SÖZLEŞME (Faz 1'in asıl çıktısı)
+## 10. Git akışı
 
-Bu sözleşme sabitlenince iki taraf birbirini beklemeden çalışır. Ertuğrul gerçek AI hazır olana kadar **sahte (mock) cevap** döner, ben de buna göre ilerlerim.
-
-### 4.1 `POST /moderate` — tek mesaj analizi
-İstek:
-```json
-{ "lesson_id": "uuid", "text": "Hocam bu x neden eksi oldu?", "lesson_topic": "Denklemler" }
-```
-Cevap:
-```json
-{
-  "moderation_status": "approved | rewrite_required | clarification_required | rejected",
-  "suggested_text": "X neden eksi oldu?",
-  "rewrite_needed": true,
-  "user_feedback": "Öğrenciye gösterilecek kısa Türkçe açıklama (engelleme durumunda)",
-  "topic": "Denklemler",
-  "concept": "İşaret değişimi",
-  "issue_type": "conceptual_question",
-  "confidence": 0.91
-}
-```
-Kurallar: `writing-block.md` §8–§10 (minimum müdahale, anlamı değiştirme, eleştiriyi sansürleme, hakareti engelleme).
-
-### 4.2 `POST /cluster` — 5 dk'lık ortak sorun analizi
-İstek: `lesson_id`, eşik (sabit 3), dersin onaylı mesajları `[{message_id, session_id, final_text, topic, concept}]`
-Cevap: `[{ topic, concept, label, message_ids[], distinct_session_count }]`
-Sayım **benzersiz oturum** üzerinden (aynı öğrenci 10 kez sorsa 1).
-
-### 4.3 `POST /summary` — ders sonu özeti
-İstek: dersin onaylı mesajları + küme listesi → Cevap: kısa Türkçe özet + "tekrar önerilen konu". (Faz 3+ için, şimdilik sadece şeması.)
-
-### 4.4 Video
-Video tamamen Next.js tarafında (token endpoint'i dahil). AI servisinin video ile işi yok; bu bölüm Ertuğrul için sözleşme içermez.
-
-### 4.5 n8n → Next.js tetikleyici
-n8n yalnızca 5 dakikada bir `POST {WEB_URL}/api/internal/analysis/tick` çağırır (başlık: `Authorization: Bearer <INTERNAL_API_KEY>`). Gerisini Next.js yapar (bkz. §6-2).
-
-### 4.6 Ortak güvenlik şartı
-AI servisi sadece `Authorization: Bearer <INTERNAL_API_KEY>` ile cevap verir. Anahtar `.env`'de, repoya girmez.
+- `main` ve `Development` doğrudan commit almaz.
+- Herkes `Development`'tan dal açar ve push eder: `app/<konu>` (Alaaddin), `ai/<konu>` (Ertuğrul).
+- Birleştirmeyi **Alaaddin** yapar (`Development`, sonra `main`).
+- Ortak dosyalar (`README.md`, `.env.example`) için yalnızca kendi bölümünüzü ekleyin.
+- `.env` ve anahtarlar asla commit edilmez.
 
 ---
 
-## 5. FAZ 1 kapsamı — kim ne yapacak
-
-Faz 1 hedefi: **"Öğretmen ders açar, öğrenci kodla girer, iki ayrı arayüz görünür; AI servisi mock da olsa sözleşmeyle konuşulur."** Video ve gerçek AI sonraki fazlarda.
-
-### Alaaddin (web/)
-1. Next.js + TypeScript + Tailwind projesi (`web/`), `.gitignore`, `.env.example`
-2. Supabase projesi (birlikte kurulacak) + şema (teachers, classrooms, lessons, lesson_participants, student_messages, message_teacher_status …) + RLS taslağı
-3. Landing sayfası (`/`)
-4. Öğretmen girişi (`/teacher/login`) — Supabase Auth
-5. Dashboard + yeni ders oluşturma + katılım kodu üretme (`/teacher/dashboard`, `/teacher/lessons/new`, `/teacher/lessons/[id]`)
-6. Öğrenci katılımı (`/join`) — kodla, isim/e-posta zorunlu değil, anonim kısa ömürlü oturum
-7. `/live/[lessonId]` iskeleti: rol bazlı sağ panel (öğrenci: "Anonim Sorularım", öğretmen: "Gelen Sorular"), video alanı için placeholder
-8. AI servisine çağrı yapan **adapter katmanı** (`lib/ai-client.ts`) — mock sunucuya karşı çalışır
-
-### Ertuğrul (ai-service/, docker/)
-1. AI servisi iskeleti (FastAPI, repodaki `main.py` buradan büyüyebilir): §4.1–4.3 endpoint'leri **mock cevapla** ayakta
-2. `docker-compose`'a AI servisini ekle (n8n zaten var)
-3. Gemini'yi tek bir `provider` arayüzü arkasına alıp ilk `/moderate` denemesi (anahtar `.env`'de, workflow JSON'larında **asla**)
-4. `.env.example` ve README: nasıl ayağa kalkar, hangi port
-5. n8n workflow'unu §6-2'deki modele sadeleştir (sadece 5 dk zamanlayıcı → `tick` çağrısı)
-
-### Faz 1 bitiş kriteri (ikimiz birlikte)
-- [ ] Ben bir ders oluşturup kod alıyorum, ikinci tarayıcıdan öğrenci olarak giriyorum, iki farklı panel görünüyor
-- [ ] Next.js, Ertuğrul'un `/moderate` endpoint'ine istek atıp mock cevabı alıyor
-- [ ] n8n 5 dk'lık zamanlayıcıyla Next.js `tick` endpoint'ini çağırabiliyor (boş sonuç dönse bile)
-
----
-
-## 6. Konuşmamız gereken kararlar
-
-1. ✅ **Video komple Alaaddin'de** (LiveKit sunucusu, token, React bileşeni).
-2. ✅ **n8n'in rolü** (onaylandı):
-   - n8n yalnızca **saat**: 5 dk'da bir Next.js'e `POST /api/internal/analysis/tick` atar.
-   - Next.js (`tick`): canlı dersleri bulur → her ders için **tüm onaylı mesajları** Supabase'den çeker (pencere sorunu olmasın diye "yalnızca yeni" değil) → AI servisine `/cluster` ister → sonucu (küme, benzersiz oturum sayısı, bildirim) kaydeder → Realtime ile öğretmen paneline düşer. Aynı konu için tekrar sesli uyarı, küme kaydındaki "uyarıldı" bilgisiyle engellenir.
-   - **Eşik sabit 3** (kodda sabit, arayüzden ayarlanmaz).
-   - AI servisi **stateless**: mesaj listesi alır, kümeleri döner, veritabanını görmez.
-   - "Demo: Analizi şimdi çalıştır" butonu aynı `tick` kodunu çağırır; demoda n8n'e bağımlı kalmayız.
-   - Mevcut workflow'daki dosya kuyruğu (`bekleyen_mesajlar.json`) kalkar; mesajlar zaten Supabase'de.
-3. ✅ **Sonuç platforma nasıl döner:** AI servisi hiçbir şey yazmaz, Next.js yazar (yukarıdaki akış).
-4. ✅ **AI sağlayıcısı: Gemini.** Model adı Ertuğrul'dan teyit edilecek (workflow'daki `gemini-3.8-flash` geçerli mi?). Anahtar sadece AI servisinin `.env`'inde.
-5. ✅ **AI Python/FastAPI'de** (Seçenek A). Seçenekler: A (Python, seçildi), B (kümeleme n8n'de), C (Next.js içinde). Detay §3.1–3.2.
-6. ✅ **Zaman bütçesi: 12 saat.** Kesilenler §7'de, saat planı §8'de.
-6b. ⏳ **Rate limit (önemli, konuşulacak).** Taslak öneri, hepsi Next.js'te (AI'a gitmeden önce) uygulanır:
-   - Oturum başına dakikada en fazla **6 mesaj**, ders başına en fazla **30 mesaj**
-   - Mesaj uzunluğu en fazla **500 karakter**
-   - Aynı oturumdan **60 sn içinde aynı metin** tekrar kabul edilmez
-   - Limiti aşınca öğrenciye anlaşılır Türkçe uyarı ("Biraz bekleyip tekrar dene")
-   - Gemini'yi kota/maliyete karşı korur; `/moderate` çağrılarının hepsi bu sınırdan geçer
-   - MVP'de bellek içi sayaç yeterli (tek sunucu); sayılar `config` dosyasında sabit
-7. ✅ **Supabase:** hosted proje, birlikte kuracağız. Faz 1'in ilk adımı.
-8. ✅ **Git akışı:**
-   - `main` ve `Development` doğrudan commit almaz.
-   - Herkes `Development`'tan kendi dalını açar ve onu push eder: `web/<konu>` (Alaaddin), `ai/<konu>` (Ertuğrul). Örn. `web/faz1-temel`, `ai/moderate-mock`.
-   - Dalları `Development`'a **Alaaddin** birleştirir, `main`'e de o alır.
-   - Klasörler ayrı olduğu için çakışma çıkmaz; ortak dokunulan tek dosya kök `README.md` / `.env.example`, bunlara yalnızca kendi bölümünüzü ekleyin.
-   - `.env` dosyaları ve API anahtarları asla commit edilmez (`.gitignore` ilk işlerden).
-
----
-
-## 7. Şimdilik kapsam dışı (12 saatlik MVP — sonradan geliştirilecek backlog)
-
-Anonim oturum, rol bazlı erişim ve RLS **kesilmiyor** (çekirdek).
-
-- Koyu tema
-- Ayarlanabilir eşik (kodda sabit 3)
-- Ham mesaj için otomatik silme / ayrı güvenli depo (MVP: `original_text` ayrı alanda, RLS ile öğretmenden gizli)
-- Gelişmiş erişilebilirlik (ekran okuyucu, tam klavye, reduced motion); temel okunaklılık yeterli
-- Seed verisi dışındaki süslemeler (animasyon, ince görsel detay)
-- Tehdit/güvenlik riski için ayrı yetkili inceleme süreci (sadece dokümante)
-- shadcn/ui, Recharts yalnızca gerçekten gerekince
-- Mobil için ince ayar (temel responsive yeterli)
-- KVKK/okul izni notu: README'ye tek paragraf
-
-## 8. 12 saatlik plan (taslak, saatler yaklaşık)
+## 11. 12 saatlik plan (taslak)
 
 | Saat | Alaaddin (web) | Ertuğrul (AI) | Birlikte |
 |---|---|---|---|
-| 0–1 | Next.js kurulumu, Supabase hesabı | AI servis iskeleti (mock `/moderate`, `/cluster`) | Supabase'i birlikte kur, `.env.example`, sözleşme onayı |
-| 1–3 | Landing, öğretmen girişi, ders oluşturma, katılım kodu, `/join`, anonim oturum | Gemini bağlantısı, gerçek `/moderate` | |
-| 3–5 | LiveKit: token + `/live` video | Moderasyon/sadeleştirme prompt kalitesi, test mesajları | |
-| 5–8 | Öğrenci paneli, mesaj akışı + önizleme/onay, rate limit, öğretmen soru paneli, Realtime, rozet | `/cluster` kümeleme, n8n 5 dk zamanlayıcı | İlk uçtan uca deneme (saat ~8) |
-| 8–10 | `tick` endpoint, sesli uyarı, chatbot aç/kapat, "Analizi şimdi çalıştır" butonu | Kümeleme iyileştirme, hata/fallback | |
-| 10–11 | (zaman kalırsa) zaman çizelgesi + rapor | `/summary` | |
+| 0–1 | Supabase hesabı + proje, şema | `/analyze-batch` mock | Sözleşme onayı, `.env.example` |
+| 1–3 | Landing, giriş, ders oluşturma, katılım kodu, `/join`, anonim oturum | Gemini bağlantısı, gerçek `/analyze-batch` | |
+| 3–5 | LiveKit token + `/live` video | Prompt kalitesi, test mesajları | |
+| 5–8 | Öğrenci mesaj gönderme + durumlar, rate limit, `tick`, öğretmen kart paneli, Realtime, rozet | Mevcut karta ekleme (kart birleştirme) kalitesi, n8n zamanlayıcı | **İlk uçtan uca deneme (~saat 8)** |
+| 8–10 | Chatbot aç/kapat, "Analizi şimdi çalıştır", sıralama, güncellendi durumu | Hata/fallback, tekrar deneme | |
+| 10–11 | (zaman kalırsa) zaman çizelgesi + ders sonu raporu | `/summary` | |
 | 11–12 | Demo verisi, hata düzeltme | Hata düzeltme | Demo provası |
+
+---
+
+## 12. Kapsam dışı (backlog)
+
+- Anlık önizleme/onay akışı (şimdilik yok)
+- Sesli uyarı
+- Ayarlanabilir eşik
+- Koyu tema
+- Ham mesaj için otomatik silme / ayrı güvenli depo (MVP: ham metin yalnızca `student_messages.original_text`, öğretmen erişemez)
+- Gelişmiş erişilebilirlik
+- Seed dışı süslemeler
+- Tehdit/güvenlik riski için ayrı yetkili inceleme süreci
+- Sınıf (`classrooms`) tablosu
+- KVKK/okul izni: README'ye tek paragraf
+
+---
+
+## 13. Açık sorular
+
+1. ⏳ Öğrenci için önizleme/onay kalktı mı (varsayım: evet)?
+2. ⏳ Proje adı
+3. ⏳ Gemini model adı: workflow'daki `gemini-3.8-flash` geçerli mi?
+4. ⏳ Supabase hesabı (URL + anon key) — birlikte kurulacak
