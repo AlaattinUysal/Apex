@@ -1,7 +1,6 @@
 // Tek yerde duran sabitler (FAZ1.md §7). Değiştirmek için sadece burayı düzenle.
 
 export const RATE_LIMITS = {
-  perMinute: 6, // oturum başına dakikada en fazla mesaj
   perLesson: 30, // oturum başına ders boyunca en fazla mesaj
   maxChars: 500, // mesaj uzunluğu
   duplicateWindowMs: 60_000, // aynı metin bu süre içinde tekrar kabul edilmez
