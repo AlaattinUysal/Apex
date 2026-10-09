@@ -12,8 +12,18 @@ try:
 except Exception:
     pass
 
+try:
+    from dotenv import load_dotenv
+    # ai-service/.env veya yerel .env varsa otomatik oku
+    env_path = os.path.join(os.path.dirname(__file__), "ai-service", ".env")
+    if os.path.exists(env_path):
+        load_dotenv(env_path)
+    load_dotenv()
+except ImportError:
+    pass
+
 AI_SERVICE_URL = os.getenv("AI_SERVICE_URL", "http://localhost:8000/analyze-batch")
-AUTH_TOKEN = os.getenv("INTERNAL_API_KEY", "apex-internal-secret-key-2026")
+AUTH_TOKEN = os.getenv("INTERNAL_API_KEY", "").strip()
 
 SAMPLE_BATCHES = {
     "1": {
@@ -177,6 +187,11 @@ SAMPLE_BATCHES = {
 }
 
 def send_batch(payload):
+    if not AUTH_TOKEN:
+        print("❌ HATA: INTERNAL_API_KEY ortam değişkeni tanımlanmamış!")
+        print("💡 İpucu: 'INTERNAL_API_KEY' ortam değişkenini ayarlayın veya ai-service/.env dosyasına ekleyin.")
+        return None
+
     data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(
         AI_SERVICE_URL,
