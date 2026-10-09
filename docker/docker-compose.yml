@@ -1,4 +1,15 @@
 services:
+  ai-service:
+    build:
+      context: ../ai-service
+      dockerfile: Dockerfile
+    container_name: ai-service
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../ai-service/.env
+
   n8n:
     image: docker.n8n.io/n8nio/n8n:latest
     container_name: n8n
@@ -13,8 +24,6 @@ services:
       - WEBHOOK_URL=http://localhost:5678/
       - GENERIC_TIMEZONE=Europe/Istanbul
       - TZ=Europe/Istanbul
-      - NODE_FUNCTION_ALLOW_BUILTIN=*
-      - NODE_FUNCTION_ALLOW_EXTERNAL=*
     volumes:
       - n8n_data:/home/node/.n8n
 

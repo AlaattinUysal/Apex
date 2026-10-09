@@ -1,110 +1,164 @@
 import json
-import time
 import urllib.request
 import urllib.error
+import time
+import sys
 
-WEBHOOK_URL = "http://localhost:5678/webhook/yeni-mesaj"
-TEST_WEBHOOK_URL = "http://localhost:5678/webhook-test/yeni-mesaj"
+# Windows konsolunda UTF-8 çıktı desteği
+try:
+    if sys.stdout.encoding != "utf-8":
+        sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
 
-current_url = WEBHOOK_URL
+AI_SERVICE_URL = "http://localhost:8000/analyze-batch"
+AUTH_TOKEN = "apex-internal-secret-key-2026"
 
-MESAJLAR = [
-    {
-        "id": 1,
-        "kullanici": "Ahmet",
-        "mesaj": 'Hocam for döngüsüyle listeyi gezerken "IndexError: list index out of range" hatası alıyorum, neden olabilir?',
-        "aciklama": "for döngüsünde IndexError hatası"
+SAMPLE_BATCHES = {
+    "1": {
+        "title": "İlk Tur (Açık kart yok, 5 anonim mesaj: 2 benzer, 1 uygunsuz, 1 feedback, 1 soru)",
+        "payload": {
+            "lesson": {
+                "subject": "Python",
+                "topic": "Listeler ve Döngüler"
+            },
+            "open_cards": [],
+            "messages": [
+                {
+                    "message_id": "m-101",
+                    "text": "Hocam for döngüsüyle listeyi gezerken 'IndexError: list index out of range' hatası alıyorum, neden olabilir?"
+                },
+                {
+                    "message_id": "m-102",
+                    "text": "Listede son elemana ulaşmaya çalışırken IndexError veriyor, len() fonksiyonu kullanırken bir yeri mi kaçırıyorum?"
+                },
+                {
+                    "message_id": "m-103",
+                    "text": "Fonksiyon içinde return kullanmak ile sadece print yazmak arasındaki fark nedir hocam?"
+                },
+                {
+                    "message_id": "m-104",
+                    "text": "Boş yapma hoca ders çok sıkıcı böyle ders mi anlatılır kapat git ya"
+                },
+                {
+                    "message_id": "m-105",
+                    "text": "Hocam kodları biraz daha yavaş yazabilir misiniz, yetişemiyoruz."
+                }
+            ]
+        }
     },
-    {
-        "id": 2,
-        "kullanici": "Zeynep",
-        "mesaj": "Listede son elemana ulaşmaya çalışırken IndexError veriyor, len() fonksiyonu kullanırken bir yeri mi kaçırıyorum?",
-        "aciklama": "len() ve liste son eleman IndexError (Benzer Hata)"
-    },
-    {
-        "id": 3,
-        "kullanici": "Mehmet",
-        "mesaj": "Fonksiyon içinde return kullanmak ile sadece print yazmak arasındaki fark nedir hocam?",
-        "aciklama": "return vs print farkı"
-    },
-    {
-        "id": 4,
-        "kullanici": "Burak",
-        "mesaj": "Boş yapma hoca ders çok sıkıcı böyle ders mi anlatılır kapat git ya",
-        "aciklama": "Uygunsuz / kaba mesaj (Filtrelenmesi gereken)"
-    },
-    {
-        "id": 5,
-        "kullanici": "Elif",
-        "mesaj": "Hocam bir listeye başka bir listeyi eklerken append() mi yoksa extend() mi kullanmalıyız?",
-        "aciklama": "append() vs extend() farkı"
+    "2": {
+        "title": "İkinci Tur (Önceki kart açık, yeni mesajın mevcut karta bağlanması testi)",
+        "payload": {
+            "lesson": {
+                "subject": "Python",
+                "topic": "Listeler ve Döngüler"
+            },
+            "open_cards": [
+                {
+                    "card_id": "card-list-index",
+                    "topic_label": "Liste İndeks Sınırları",
+                    "summary_text": "for döngüsünde son elemana erişirken IndexError alınıyor."
+                }
+            ],
+            "messages": [
+                {
+                    "message_id": "m-201",
+                    "text": "Hocam negatif indeks kullanınca da IndexError verir mi?"
+                },
+                {
+                    "message_id": "m-202",
+                    "text": "Hocam append() ve extend() farkı nedir?"
+                }
+            ]
+        }
     }
-]
+}
 
-def mesaj_gonder(kullanici, mesaj):
-    payload = json.dumps({"kullanici": kullanici, "mesaj": mesaj}).encode("utf-8")
+def send_batch(payload):
+    data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     req = urllib.request.Request(
-        current_url,
-        data=payload,
-        headers={"Content-Type": "application/json; charset=utf-8"},
+        AI_SERVICE_URL,
+        data=data,
+        headers={
+            "Content-Type": "application/json; charset=utf-8",
+            "Authorization": f"Bearer {AUTH_TOKEN}"
+        },
         method="POST"
     )
-    print(f"\n📤 Gönderiliyor: [{kullanici}] -> {mesaj}")
+
+    print("\n" + "=" * 70)
+    print("📤 İSTEK GÖNDERİLİYOR -> POST /analyze-batch")
+    print(f"Mesaj Sayısı: {len(payload.get('messages', []))} | Açık Kart Sayısı: {len(payload.get('open_cards', []))}")
+    print("=" * 70)
+
+    start = time.time()
     try:
-        with urllib.request.urlopen(req) as response:
-            res_body = response.read().decode("utf-8")
-            print(f"✅ Yanıt ({response.status}): {res_body}")
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            duration = time.time() - start
+            body = resp.read().decode("utf-8")
+            result = json.loads(body)
+
+            print(f"✅ YANIT ALINDI ({resp.status} OK - {duration:.2f} sn)\n")
+            
+            print("📋 MESAJ KARARLARI (MODERASYON & BAĞLANTI):")
+            for m in result.get("messages", []):
+                decision_badge = "✅ DELIVER" if m["decision"] == "deliver" else f"❌ REJECT ({m.get('reject_reason')})"
+                card_badge = f"-> Kart: {m.get('card_ref')}" if m.get("card_ref") else ""
+                print(f"  • {m['message_id']:<8} : {decision_badge} {card_badge}")
+
+            print("\n🗂️ YENİ AÇILAN KARTLAR (new_cards):")
+            new_cards = result.get("new_cards", [])
+            if not new_cards:
+                print("  (Yeni kart açılmadı)")
+            for c in new_cards:
+                print(f"  • [{c['ref']}] [{c.get('kind', 'question').upper()}] {c['topic_label']}:")
+                print(f"    \"{c['summary_text']}\"")
+
+            print("\n🔄 GÜNCELLENEN KARTLAR (updated_cards):")
+            updated = result.get("updated_cards", [])
+            if not updated:
+                print("  (Güncellenen kart yok)")
+            for u in updated:
+                print(f"  • [{u['card_id']}] -> \"{u['summary_text']}\"")
+
+            print("=" * 70)
+            return result
     except urllib.error.HTTPError as e:
-        error_body = e.read().decode("utf-8", errors="ignore")
-        print(f"⚠️ HTTP Hatası ({e.code}): {error_body}")
+        err = e.read().decode("utf-8", errors="ignore")
+        print(f"❌ HTTP HATASI ({e.code}): {err}")
     except Exception as e:
-        print(f"❌ Bağlantı Hatası: {e}")
+        print(f"❌ BAĞLANTI HATASI: {e}")
+        print("💡 İpucu: ai-service çalışıyor mu? (http://localhost:8000)")
 
 def main():
-    global current_url
     while True:
-        mode_str = "PROD (/webhook/)" if current_url == WEBHOOK_URL else "TEST (/webhook-test/)"
         print("\n" + "=" * 65)
-        print("          n8n ÖĞRENCİ MESAJ GÖNDERME PANELİ (PYTHON)")
+        print("          APEX AI SERVICE - ANONİM TEST İSTEMCİSİ")
         print("=" * 65)
-        print(f"Hedef URL: {current_url} [{mode_str}]")
+        print(f"Hedef URL: {AI_SERVICE_URL}")
         print("-" * 65)
-        for m in MESAJLAR:
-            print(f"[{m['id']}] {m['kullanici']:<7} : {m['aciklama']}")
-        print("\n[6] TÜMÜNÜ SIRAYLA GÖNDER (2 sn arayla)")
-        print("[7] Kendin özel mesaj yazıp gönder")
-        print("[8] URL Modunu Değiştir (Test / Üretim)")
+        print("[1] 1. Test Batch'i (İlk tur: 5 anonim mesaj, küfür eleme, konu kartları)")
+        print("[2] 2. Test Batch'i (İkinci tur: Mevcut açık karta ekleme testi)")
+        print("[3] Özel Metin Gir ve Tek Mesajlık Batch Test Et")
         print("[0] Çıkış")
         print("=" * 65)
 
-        secim = input("Seçiminiz (0-8): ").strip()
+        secim = input("Seçiminiz (0-3): ").strip()
         if secim == "0":
             print("Çıkış yapıldı.")
             break
-        elif secim in ["1", "2", "3", "4", "5"]:
-            idx = int(secim) - 1
-            mesaj_gonder(MESAJLAR[idx]["kullanici"], MESAJLAR[idx]["mesaj"])
-        elif secim == "6":
-            print("\n🚀 Tüm mesajlar sırayla gönderiliyor...")
-            for i, m in enumerate(MESAJLAR, 1):
-                print(f"\n[{i}/5] Gönderiliyor...")
-                mesaj_gonder(m["kullanici"], m["mesaj"])
-                if i < len(MESAJLAR):
-                    time.sleep(2)
-            print("\n✨ Tüm mesajlar gönderildi!")
-        elif secim == "7":
-            ad = input("\nÖğrenci Adı: ").strip() or "Anonim"
-            msg = input("Mesaj: ").strip()
-            if msg:
-                mesaj_gonder(ad, msg)
-            else:
-                print("Boş mesaj gönderilmedi.")
-        elif secim == "8":
-            if current_url == WEBHOOK_URL:
-                current_url = TEST_WEBHOOK_URL
-            else:
-                current_url = WEBHOOK_URL
-            print(f"\n🔄 URL Değiştirildi -> {current_url}")
+        elif secim in ["1", "2"]:
+            send_batch(SAMPLE_BATCHES[secim]["payload"])
+        elif secim == "3":
+            text = input("Test mesajını yazın: ").strip()
+            if text:
+                custom_payload = {
+                    "lesson": {"subject": "Python", "topic": "Genel"},
+                    "open_cards": [],
+                    "messages": [{"message_id": f"m-custom-{int(time.time())}", "text": text}]
+                }
+                send_batch(custom_payload)
         else:
             print("Geçersiz seçim!")
 

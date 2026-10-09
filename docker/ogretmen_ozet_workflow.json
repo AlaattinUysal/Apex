@@ -1,42 +1,13 @@
 {
-  "name": "Kullanıcı Mesajları Toplayıcı ve Öğretmen Özet Ajanı",
+  "name": "5 Dakikalık Analiz Zamanlayıcısı (Tick)",
   "nodes": [
-    {
-      "parameters": {
-        "httpMethod": "POST",
-        "path": "yeni-mesaj",
-        "responseMode": "onReceived",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
-      "position": [
-        220,
-        240
-      ],
-      "id": "webhook-mesaj-alici",
-      "name": "Webhook (Kullanıcı Mesajı Geldi)"
-    },
-    {
-      "parameters": {
-        "jsCode": "const fs = require('fs');\nconst filePath = '/home/node/.n8n/bekleyen_mesajlar.json';\n\nconst kayit = {\n  zaman: new Date().toISOString(),\n  gonderen: $json.body?.kullanici || 'Anonim',\n  mesaj: $json.body?.mesaj || ''\n};\n\nfs.appendFileSync(filePath, JSON.stringify(kayit) + '\\n', 'utf8');\n\nreturn [{ json: { durum: 'kaydedildi', kayit } }];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        460,
-        240
-      ],
-      "id": "dosyaya-kaydet",
-      "name": "Mesajı Kuyruğa Kaydet"
-    },
     {
       "parameters": {
         "rule": {
           "interval": [
             {
-              "field": "seconds",
-              "secondsInterval": 30
+              "field": "minutes",
+              "minutesInterval": 5
             }
           ]
         }
@@ -45,10 +16,10 @@
       "typeVersion": 1.2,
       "position": [
         220,
-        480
+        300
       ],
-      "id": "zamanlayici-30sn",
-      "name": "Her 30 Saniyede Bir Çalış"
+      "id": "zamanlayici-5dk",
+      "name": "Her 5 Dakikada Bir Çalış"
     },
     {
       "parameters": {},
@@ -56,170 +27,46 @@
       "typeVersion": 1,
       "position": [
         220,
-        660
+        480
       ],
       "id": "manuel-tetikleyici",
       "name": "Manuel Tetikle (Test)"
     },
     {
       "parameters": {
-        "jsCode": "const fs = require('fs');\nconst filePath = '/home/node/.n8n/bekleyen_mesajlar.json';\n\nlet mesajlar = [];\n\nif (fs.existsSync(filePath)) {\n  const content = fs.readFileSync(filePath, 'utf8').trim();\n  if (content) {\n    const lines = content.split('\\n').filter(Boolean);\n    mesajlar = lines.map(line => {\n      try {\n        return JSON.parse(line);\n      } catch (e) {\n        return { mesaj: line };\n      }\n    });\n    fs.writeFileSync(filePath, '');\n  }\n}\n\nconst birlestirilmisMetin = mesajlar.map((m, idx) => `${idx + 1}. [${m.gonderen || 'Öğrenci'}]: ${m.mesaj}`).join('\\n');\n\nreturn [{\n  json: {\n    toplam_mesaj_sayisi: mesajlar.length,\n    birlestirilmis_mesajlar: birlestirilmisMetin\n  }\n}];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        460,
-        480
-      ],
-      "id": "mesajlari-topla-ve-temizle",
-      "name": "Mesajları Oku ve Topla"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict"
-          },
-          "conditions": [
-            {
-              "id": "c1",
-              "leftValue": "={{ $json.toplam_mesaj_sayisi }}",
-              "rightValue": 0,
-              "operator": {
-                "type": "number",
-                "operation": "gt"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.2,
-      "position": [
-        700,
-        480
-      ],
-      "id": "mesaj-var-mi-kontrol",
-      "name": "Mesaj Var mı?"
-    },
-    {
-      "parameters": {
         "method": "POST",
-        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=BURAYA_GEMINI_API_KEY_GELECEK",
+        "url": "http://host.docker.internal:3000/api/internal/analysis/tick",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
-              "name": "Content-Type",
-              "value": "application/json; charset=utf-8"
+              "name": "Authorization",
+              "value": "Bearer apex-internal-secret-key-2026"
             },
             {
-              "name": "Accept",
-              "value": "application/json; charset=utf-8"
+              "name": "Content-Type",
+              "value": "application/json"
             }
           ]
         },
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ contents: [{ parts: [{ text: 'Sen bir eğitim asistanısın. Görevin, son periyotta öğrencilerden gelen mesajları bir öğretmen için net, yapıcı ve profesyonel bir şekilde özetlemektir.\\n\\nKURALLAR:\\n1. Uygunsuz, argo, spam veya anlamsız mesajları tamamen görmezden gel ve özete dahil etme.\\n2. Öğrencilerin sorduğu soruları, takıldıkları noktaları ve ana konuları maddeler halinde özetle.\\n3. Öğretmenin hızlıca aksiyon alabileceği bir formatta sun.\\n\\nİşte gelen öğrenci mesajları:\\n\\n' + ($json.birlestirilmis_mesajlar || '') }] }], generationConfig: { temperature: 0.3 } }) }}"
+        "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        960,
-        460
+        500,
+        380
       ],
-      "id": "yapay-zeka-ozet-istegi",
-      "name": "Yapay Zeka Ajanı (Öğretmen Özeti)"
-    },
-    {
-      "parameters": {
-        "jsCode": "const fs = require('fs');\n\nlet raw = $json.candidates?.[0]?.content?.parts?.[0]?.text || 'Özet üretilemedi.';\n\n// Mojibake Karakter Düzeltme (GBK/UTF8 Uyumsuzluğunu Onar)\nconst mojibakeMap = {\n  '谋': 'ı', '枚': 'ö', '臒': 'ğ', '莽': 'ç', '艧': 'ş', '眉': 'ü',\n  '陌': 'İ', '脰': 'Ö', '脟': 'Ç', '舰': 'Ş', '脺': 'Ü', '臑': 'Ğ',\n  '馃搶': '📌'\n};\nraw = raw.replace(/[谋枚臒莽艧眉陌脰脟舰脺臑]|馃搶/g, m => mojibakeMap[m] || m);\n\nconst zaman = new Date().toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' });\n\n// Okunabilir HTML Raporu Hazırla\nconst htmlContent = `<!DOCTYPE html>\n<html lang=\"tr\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>Öğretmen Ders Özeti Paneli</title>\n  <style>\n    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 2rem; }\n    .card { max-width: 850px; margin: 0 auto; background: #1e293b; border-radius: 12px; padding: 2.5rem; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid #334155; }\n    h1 { color: #38bdf8; font-size: 1.8rem; margin-top: 0; }\n    .badge { background: #0284c7; color: #fff; padding: 4px 12px; border-radius: 9999px; font-size: 0.85rem; font-weight: 600; }\n    .time { color: #94a3b8; font-size: 0.9rem; margin-top: 0.5rem; }\n    hr { border: none; border-top: 1px solid #334155; margin: 1.5rem 0; }\n    .report { white-space: pre-wrap; font-size: 1.05rem; line-height: 1.7; color: #e2e8f0; }\n  </style>\n</head>\n<body>\n  <div class=\"card\">\n    <span class=\"badge\">🎓 Öğretmen Asistanı</span>\n    <h1>Son Öğrenci Soruları Özeti</h1>\n    <div class=\"time\">Rapor Tarihi: ${zaman}</div>\n    <hr>\n    <div class=\"report\">${raw}</div>\n  </div>\n</body>\n</html>`;\n\ntry {\n  fs.writeFileSync('/home/node/.n8n/son_ogretmen_ozeti.html', htmlContent, 'utf8');\n  fs.writeFileSync('/home/node/.n8n/son_ogretmen_ozeti.md', raw, 'utf8');\n} catch (e) {}\n\nreturn [{\n  json: {\n    durum: 'basarili',\n    tarih: zaman,\n    okunabilir_ozet: raw\n  }\n}];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1200,
-        460
-      ],
-      "id": "ai-cevabini-isle",
-      "name": "AI Yanıtını Formatla"
-    },
-    {
-      "parameters": {
-        "httpMethod": "GET",
-        "path": "ozet",
-        "responseMode": "responseNode",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
-      "position": [
-        220,
-        860
-      ],
-      "id": "webhook-ozet-goruntule",
-      "name": "Webhook (Özeti Görüntüle - GET /ozet)"
-    },
-    {
-      "parameters": {
-        "jsCode": "const fs = require('fs');\nconst filePath = '/home/node/.n8n/son_ogretmen_ozeti.html';\nlet html = '<!DOCTYPE html><html lang=\"tr\"><head><meta charset=\"UTF-8\"><title>Özet</title></head><body style=\"background:#0f172a;color:#fff;font-family:sans-serif;padding:2rem;\"><h1>Henüz özet üretilmedi</h1><p>Lütfen mesaj gönderdikten sonra tekrar yenileyin.</p></body></html>';\n\nif (fs.existsSync(filePath)) {\n  html = fs.readFileSync(filePath, 'utf8');\n}\n\nreturn [{ json: { html } }];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        460,
-        860
-      ],
-      "id": "html-rapor-oku",
-      "name": "HTML Raporunu Oku"
-    },
-    {
-      "parameters": {
-        "respondWith": "text",
-        "responseBody": "={{ $json.html }}",
-        "options": {
-          "responseHeaders": {
-            "entries": [
-              {
-                "name": "Content-Type",
-                "value": "text/html; charset=utf-8"
-              }
-            ]
-          }
-        }
-      },
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [
-        700,
-        860
-      ],
-      "id": "html-yanit-don",
-      "name": "Tarayıcıya HTML Olarak Göster"
+      "id": "tick-cagrisi",
+      "name": "Next.js Analiz Tetikle (Tick)"
     }
   ],
   "connections": {
-    "Webhook (Kullanıcı Mesajı Geldi)": {
+    "Her 5 Dakikada Bir Çalış": {
       "main": [
         [
           {
-            "node": "Mesajı Kuyruğa Kaydet",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Her 30 Saniyede Bir Çalış": {
-      "main": [
-        [
-          {
-            "node": "Mesajları Oku ve Topla",
+            "node": "Next.js Analiz Tetikle (Tick)",
             "type": "main",
             "index": 0
           }
@@ -230,62 +77,7 @@
       "main": [
         [
           {
-            "node": "Mesajları Oku ve Topla",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Mesajları Oku ve Topla": {
-      "main": [
-        [
-          {
-            "node": "Mesaj Var mı?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Mesaj Var mı?": {
-      "main": [
-        [
-          {
-            "node": "Yapay Zeka Ajanı (Öğretmen Özeti)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Yapay Zeka Ajanı (Öğretmen Özeti)": {
-      "main": [
-        [
-          {
-            "node": "AI Yanıtını Formatla",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Webhook (Özeti Görüntüle - GET /ozet)": {
-      "main": [
-        [
-          {
-            "node": "HTML Raporunu Oku",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "HTML Raporunu Oku": {
-      "main": [
-        [
-          {
-            "node": "Tarayıcıya HTML Olarak Göster",
+            "node": "Next.js Analiz Tetikle (Tick)",
             "type": "main",
             "index": 0
           }
