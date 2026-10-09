@@ -151,14 +151,14 @@ async function StudentView({ lesson, participantId }: { lesson: Lesson; particip
     .eq("participant_id", participantId)
     .order("created_at");
 
+  // Soru alımı kapalıyken kutu BİLEREK kapatılmaz: reddetme yalnızca sunucuda yapılır
+  // (öğretmen kapatınca açık kalmış sayfalar da aynı şekilde reddedilir). Yalnızca ders canlı değilse kapalı.
   const blockedReason =
-    lesson.status !== "live"
-      ? lesson.status === "ended"
+    lesson.status === "live"
+      ? null
+      : lesson.status === "ended"
         ? "Ders sona erdi."
-        : "Ders başlayınca soru yazabilirsin."
-      : lesson.chatbot_enabled
-        ? null
-        : "Öğretmen şu an yeni soru almıyor.";
+        : "Ders başlayınca soru yazabilirsin.";
 
   return (
     <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-6 py-8">
