@@ -271,5 +271,5 @@ Gerçek API anahtarı **hiçbir zaman** workflow JSON'una yazılıp commit edilm
 
 1. ✅ Öğrenci önizlemesi/durum takibi yok; chatbot sadece "Mesajın öğretmene iletilecek" der.
 2. ⏳ Proje adı
-3. ⏳ Gemini model adı: workflow'daki `gemini-3.8-flash` geçerli mi?
+3. ✅ Gemini modeli: `gemini-3.8-flash` geçerli ve stabil (Google model sayfasında listeli). Model adı `GEMINI_MODEL` env değişkeninden okunur (koda gömülmez). Yedek: `gemini-3.5-flash`. Düşünme seviyesi düşük/orta yeterli.
 4. ⏳ Supabase hesabı (URL + anon key) — birlikte kurulacak
