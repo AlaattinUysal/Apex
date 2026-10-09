@@ -11,8 +11,12 @@ export const ANALYSIS = {
   maxBatch: 100, // bir turda AI'a gönderilecek en fazla mesaj
   staleRunMs: 2 * 60_000, // bu süreden eski "running" kaydı takılmış sayılır
   // Öğretmen paneli açıkken kendiliğinden analiz aralığı (n8n'den bağımsız). Varsayılan 5 dk.
-  // Test/demo için .env.local'a NEXT_PUBLIC_AUTO_ANALYSIS_SECONDS=30 yazılabilir (en az 10 sn).
-  autoIntervalMs: Math.max(10, Number(process.env.NEXT_PUBLIC_AUTO_ANALYSIS_SECONDS) || 300) * 1000,
+  // NEXT_PUBLIC_AUTO_ANALYSIS_SECONDS: 30 gibi bir değer (en az 10 sn) aralığı değiştirir;
+  // "0" otomatik analizi tamamen kapatır (yalnızca "Analizi şimdi çalıştır" düğmesi). Test için kullanışlı.
+  autoIntervalMs:
+    process.env.NEXT_PUBLIC_AUTO_ANALYSIS_SECONDS === "0"
+      ? 0
+      : Math.max(10, Number(process.env.NEXT_PUBLIC_AUTO_ANALYSIS_SECONDS) || 300) * 1000,
 } as const;
 
 export const STUDENT_REPLY = "Mesajın öğretmene iletilecek.";

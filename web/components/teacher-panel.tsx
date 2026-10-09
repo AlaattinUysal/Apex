@@ -82,7 +82,7 @@ export function TeacherPanel({
   // n8n zamanlayıcısına ek yedek: panel açıkken her 5 dakikada aynı analiz kodunu çalıştırır.
   // Kuyruk boşsa hiçbir şey yapmaz; aynı anda iki tur çalışmasını sunucu engeller.
   useEffect(() => {
-    if (!isLive) return;
+    if (!isLive || ANALYSIS.autoIntervalMs <= 0) return;
     const id = setInterval(() => runAnalysisAndReport(true), ANALYSIS.autoIntervalMs);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -123,7 +123,9 @@ export function TeacherPanel({
               ? "Mesajlar yapay zekâya gönderiliyor, birkaç saniye sürer…"
               : feedback
                 ? `${feedback.text} (${feedback.time})`
-                : `Her ${intervalLabel(ANALYSIS.autoIntervalMs)} otomatik de çalışır.`}
+                : (ANALYSIS.autoIntervalMs > 0
+                  ? `Her ${intervalLabel(ANALYSIS.autoIntervalMs)} otomatik de çalışır.`
+                  : "Otomatik analiz kapalı: yalnızca bu düğmeyle çalışır.")}
           </p>
         </div>
       )}
