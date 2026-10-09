@@ -30,8 +30,21 @@
   --color-card: var(--card);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-hanken);
+  --font-display: var(--font-fraunces), Georgia, serif;
+  --font-mono: var(--font-jetbrains);
+
+  /* Apex marka paleti (landing tasarımı). Sadece açık tema. */
+  --color-paper: #f7f4ee; /* sayfa zemini */
+  --color-cream: #fffdf9; /* kart / buton zemini */
+  --color-ink: #1b2420; /* metin ve çizgiler */
+  --color-forest: #0e5a4f; /* birincil renk */
+  --color-mint: #dcebe6;
+  --color-sand: #ede8dc;
+  --color-charcoal: #262a29; /* sert gölge ve koyu şerit */
+  --color-slate: #4c5752; /* ikincil metin */
+  --color-stone: #7a7364;
+  --color-brick: #c0321d; /* "güncellendi" noktası */
 }
 
 body {
