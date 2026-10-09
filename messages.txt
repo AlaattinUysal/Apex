@@ -1,0 +1,5 @@
+Ahmet: Hocam for döngüsüyle listeyi gezerken "IndexError: list index out of range" hatası alıyorum, neden olabilir?
+Zeynep: Listede son elemana ulaşmaya çalışırken IndexError veriyor, len() fonksiyonu kullanırken bir yeri mi kaçırıyorum?
+Mehmet: Fonksiyon içinde return kullanmak ile sadece print yazmak arasındaki fark nedir hocam?
+Burak: Boş yapma hoca ders çok sıkıcı böyle ders mi anlatılır kapat git ya
+Elif: Hocam bir listeye başka bir listeyi eklerken append() mi yoksa extend() mi kullanmalıyız?
