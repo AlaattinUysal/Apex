@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { refresh } from "next/cache";
 import { RATE_LIMITS } from "@/lib/config";
 import { getParticipantId } from "@/lib/participant";
 import { checkAndRecord } from "@/lib/rate-limit";
@@ -44,6 +44,6 @@ export async function sendMessage(_: ChatState, formData: FormData): Promise<Cha
     .insert({ lesson_id: lessonId, participant_id: participantId, original_text: text });
   if (error) return { error: "Mesaj gönderilemedi, tekrar dene." };
 
-  revalidatePath(`/live/${lessonId}`);
+  refresh(); // istemci ekranını tazeler (mesaj listesi güncellenir); sayfa önbelleğini geçersiz kılmaz
   return { sentAt: Date.now() };
 }

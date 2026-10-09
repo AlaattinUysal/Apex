@@ -1,7 +1,7 @@
 "use server";
 
 import { randomInt } from "node:crypto";
-import { revalidatePath } from "next/cache";
+import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { closeRoom, isLiveKitConfigured } from "@/lib/livekit";
 import { createClient } from "@/lib/supabase/server";
@@ -66,11 +66,11 @@ export async function setLessonStatus(lessonId: string, status: "live" | "ended"
     redirect("/dashboard");
   }
 
-  revalidatePath(`/live/${lessonId}`);
+  refresh();
 }
 
 export async function setChatbotEnabled(lessonId: string, enabled: boolean) {
   const supabase = await createClient();
   await supabase.from("lessons").update({ chatbot_enabled: enabled }).eq("id", lessonId);
-  revalidatePath(`/live/${lessonId}`);
+  refresh();
 }
