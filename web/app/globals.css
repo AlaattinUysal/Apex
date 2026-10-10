@@ -36,15 +36,21 @@
 
   /* Apex marka paleti (landing tasarımı). Sadece açık tema. */
   --color-paper: #f7f4ee; /* sayfa zemini */
-  --color-cream: #fffdf9; /* kart / buton zemini */
-  --color-ink: #1b2420; /* metin ve çizgiler */
-  --color-forest: #0e5a4f; /* birincil renk */
-  --color-mint: #dcebe6;
-  --color-sand: #ede8dc;
-  --color-charcoal: #262a29; /* sert gölge ve koyu şerit */
-  --color-slate: #4c5752; /* ikincil metin */
-  --color-stone: #7a7364;
-  --color-brick: #c0321d; /* "güncellendi" noktası */
+  --color-surface: #fffdf9; /* kartlar, panel */
+  --color-sunken: #ede8dc; /* kod etiketi, soluk zemin */
+  --color-ink: #1b2420; /* metin ve tüm kenarlar */
+  --color-ink-muted: #4c5752; /* ikincil metin */
+  --color-brand: #0e5a4f; /* birincil düğme, üstünde beyaz yazı */
+  --color-brand-tint: #dcebe6; /* açık yeşil zemin */
+  --color-charcoal: #262a29; /* koyu şerit, keskin gölgeler */
+  --color-line-strong: #7a7364; /* kesik çizgi */
+  --color-badge: #c0321d; /* kırmızı nokta */
+
+  /* Keskin (bulanıklaştırmasız) gölgeler */
+  --shadow-hard-4: 4px 4px 0 var(--color-charcoal);
+  --shadow-hard-6: 6px 6px 0 var(--color-charcoal);
+  --shadow-hard-8: 8px 8px 0 var(--color-charcoal);
+  --shadow-brand-5: 5px 5px 0 var(--color-brand);
 }
 
 body {
@@ -69,4 +75,9 @@ body {
 /* Video üzerindeki katılımcı kimlik etiketini gizle (öğrenci/öğretmen kimliği görünmesin). */
 [data-lk-theme] .lk-participant-metadata {
   display: none;
+}
+
+/* Landing: 1280px tasarım tuvaline göre çizildi; daha geniş ekranda orantılı büyür (bkz. landing-zoom.tsx). */
+.lp-zoom {
+  zoom: var(--lp-zoom, 1);
 }
