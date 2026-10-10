@@ -1,12 +1,12 @@
 import { Suspense } from "react";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { setLessonStatus } from "@/app/actions/lessons";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { LiveRoom } from "@/components/live-room";
 import type { Summary } from "@/lib/ai-client";
 import { StudentChat } from "@/components/student-chat";
-import { TeacherPanel } from "@/components/teacher-panel";
+import { TeacherHeader } from "@/components/teacher-live/header";
+import { TeacherPanel } from "@/components/teacher-live/panel";
+import { StageIdle, TeacherStage } from "@/components/teacher-live/stage";
 import { TIMEOUT_RULES } from "@/lib/config";
 import { getTeacher } from "@/lib/auth";
 import { createRoomToken, isLiveKitConfigured, type LiveRole } from "@/lib/livekit";
@@ -17,7 +17,7 @@ import { createClient } from "@/lib/supabase/server";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const LESSON_COLUMNS = "id, title, class_name, topic, join_code, status, chatbot_enabled, room_name";
 // Özet yalnızca öğretmen sorgusuna girer; öğrenci tarafına hiç çekilmez.
-const TEACHER_COLUMNS = `${LESSON_COLUMNS}, summary, summary_updated_at`;
+const TEACHER_COLUMNS = `${LESSON_COLUMNS}, summary, summary_updated_at, started_at`;
 
 type Lesson = {
   id: string;
@@ -30,6 +30,7 @@ type Lesson = {
   room_name: string;
   summary?: Summary | null;
   summary_updated_at?: string | null;
+  started_at?: string | null;
 };
 
 export default function LivePage({ params }: PageProps<"/live/[lessonId]">) {
@@ -94,46 +95,29 @@ function RoleBadge({ label }: { label: string }) {
 }
 
 async function TeacherView({ lesson, identity }: { lesson: Lesson; identity: string }) {
+  const live = lesson.status === "live";
+  const room = live && isLiveKitConfigured() ? await createRoomToken({ room: lesson.room_name, identity, role: "teacher" }) : null;
+  const idleMessage =
+    lesson.status === "ended"
+      ? "Ders sona erdi."
+      : live
+        ? "Video yapılandırılmamış (LIVEKIT_* değişkenleri eksik)."
+        : "Yayını açmak için dersi başlat.";
+
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-6 py-8">
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <Link href="/dashboard" className="text-sm text-muted hover:text-foreground">
-            ← Derslerim
-          </Link>
-          <RoleBadge label="Öğretmen görünümü" />
-          <h1 className="text-2xl font-semibold">{lesson.title}</h1>
-          <p className="text-sm text-muted">
-            {lesson.class_name} · {lesson.topic}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="rounded-lg border border-border bg-card px-4 py-2 text-center">
-            <p className="text-xs text-muted">Katılım kodu</p>
-            <p className="font-mono text-xl font-semibold tracking-[0.25em]">{lesson.join_code}</p>
-          </div>
-          {lesson.status === "draft" && (
-            <form action={setLessonStatus.bind(null, lesson.id, "live")}>
-              <button className="btn">Dersi başlat</button>
-            </form>
-          )}
-          {lesson.status === "live" && (
-            <form action={setLessonStatus.bind(null, lesson.id, "ended")}>
-              <button className="btn-ghost">Dersi bitir</button>
-            </form>
-          )}
-        </div>
-      </header>
-
-      <div className="grid flex-1 gap-6 lg:grid-cols-[1fr_22rem]">
-        <VideoArea lesson={lesson} role="teacher" identity={identity} />
-
+    <div className="flex min-h-screen flex-col bg-paper text-ink min-[1100px]:h-screen">
+      <TeacherHeader lesson={lesson} />
+      <div className="flex min-h-0 flex-1 flex-wrap gap-5 p-5 min-[1100px]:flex-nowrap">
+        {room ? (
+          <TeacherStage token={room.token} serverUrl={room.serverUrl} startedAt={lesson.started_at ?? null} />
+        ) : (
+          <StageIdle message={idleMessage} />
+        )}
         <TeacherPanel
           lessonId={lesson.id}
           summary={lesson.summary ?? null}
           summaryUpdatedAt={lesson.summary_updated_at ?? null}
-          chatbotEnabled={lesson.chatbot_enabled}
-          isLive={lesson.status === "live"}
+          isLive={live}
         />
       </div>
     </div>
