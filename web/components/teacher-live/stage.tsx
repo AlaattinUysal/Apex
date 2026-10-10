@@ -37,7 +37,7 @@ function Elapsed({ since }: { since: string }) {
   return <>{text}</>;
 }
 
-function TopBar({ startedAt }: { startedAt: string | null }) {
+export function TopBar({ startedAt }: { startedAt: string | null }) {
   return (
     <div className="relative z-10 flex flex-wrap items-center gap-2.5">
       <span className="inline-flex items-center gap-2 rounded-full bg-brand px-3.5 py-1.5 text-[13px] leading-[18px] font-bold text-white">
@@ -104,7 +104,7 @@ function Controls() {
 
 // Ekran paylaşımı varken ekran sahneyi kaplar, öğretmenin kamerası köşede küçük kutuda durur.
 // Paylaşım yoksa kamera sahneyi kaplar. Görüntü yoksa tasarımdaki "Canlı video" yer tutucusu görünür.
-function Feed({ error }: { error: string | null }) {
+export function Feed({ error, title = "Canlı video", hint }: { error: string | null; title?: string; hint?: string }) {
   const tracks = useTracks([
     { source: Track.Source.ScreenShare, withPlaceholder: false },
     { source: Track.Source.Camera, withPlaceholder: false },
@@ -117,10 +117,7 @@ function Feed({ error }: { error: string | null }) {
 
   if (!main) {
     return (
-      <Placeholder
-        title="Canlı video"
-        hint={error ?? "Kamerayı ya da ekran paylaşımını açınca görüntü burada görünür"}
-      />
+      <Placeholder title={title} hint={error ?? hint ?? "Kamerayı ya da ekran paylaşımını açınca görüntü burada görünür"} />
     );
   }
   return (
@@ -138,7 +135,7 @@ function Feed({ error }: { error: string | null }) {
   );
 }
 
-function Frame({ children }: { children: ReactNode }) {
+export function Frame({ children }: { children: ReactNode }) {
   return (
     <section aria-label="Canlı video" className={SECTION}>
       {children}
@@ -147,11 +144,11 @@ function Frame({ children }: { children: ReactNode }) {
 }
 
 // Ders canlı değilken (taslak / bitti) bağlantı kurulmaz; yalnızca yer tutucu görünür.
-export function StageIdle({ message }: { message: string }) {
+export function StageIdle({ message, title = "Canlı video" }: { message: string; title?: string }) {
   return (
     <Frame>
       <span />
-      <Placeholder title="Canlı video" hint={message} />
+      <Placeholder title={title} hint={message} />
       <span />
     </Frame>
   );

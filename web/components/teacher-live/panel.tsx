@@ -7,6 +7,7 @@ import { markSummaryAnswered, runAnalysisNow } from "@/app/actions/cards";
 import type { Summary } from "@/lib/ai-client";
 import type { AnalysisResult } from "@/lib/analysis";
 import { ANALYSIS } from "@/lib/config";
+import { mmss, secondsToNextCycle } from "@/lib/cycle";
 import { createClient } from "@/lib/supabase/client";
 import { RichText } from "./rich-text";
 
@@ -31,19 +32,19 @@ const isFeedback = (title: string) => /işleyiş|geri bildirim/.test(title.toLoc
 const RING_R = 18;
 const RING_C = 2 * Math.PI * RING_R;
 
-const mmss = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-
 // Öğretmenin "Sınıfın soruları" paneli: tek bir özet (ham mesaj yok). Özet değişince Realtime ile sayfayı
 // sunucudan tazeler. "Cevaplandı" özeti temizler, sonraki özet yalnızca yeni mesajlardan başlar.
 export function TeacherPanel({
   lessonId,
   summary,
   summaryUpdatedAt,
+  startedAt,
   isLive,
 }: {
   lessonId: string;
   summary: Summary | null;
   summaryUpdatedAt: string | null;
+  startedAt: string | null;
   isLive: boolean;
 }) {
   const router = useRouter();
@@ -53,7 +54,7 @@ export function TeacherPanel({
   const [analysing, startAnalysis] = useTransition();
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [remaining, setRemaining] = useState(intervalSec);
-  const nextAt = useRef(0);
+  const prevLeft = useRef(0);
   const busy = useRef(false);
 
   const sections = [...(summary?.sections ?? [])].sort((a, b) => Number(isFeedback(b.title)) - Number(isFeedback(a.title)));
@@ -68,7 +69,6 @@ export function TeacherPanel({
           setFeedback(describe(await runAnalysisNow(lessonId), auto));
         } finally {
           busy.current = false;
-          nextAt.current = Date.now() + ANALYSIS.autoIntervalMs;
         }
       });
     },
@@ -90,22 +90,20 @@ export function TeacherPanel({
     };
   }, [lessonId, router]);
 
-  // Geri sayım + otomatik analiz tek sayaçta: süre dolunca aynı analiz kodu çalışır (0 = kapalı).
-  // Kuyruk boşsa hiçbir şey yapmaz; aynı anda iki tur çalışmasını sunucu da engeller.
+  // Geri sayım + otomatik analiz tek sayaçta: tur sınırına gelince aynı analiz kodu çalışır (0 = kapalı).
+  // Turlar ders başlangıcına çapalı (öğrenci ekranıyla aynı sayaç). Kuyruk boşsa hiçbir şey yapmaz;
+  // aynı anda iki tur çalışmasını sunucu da engeller.
   useEffect(() => {
     if (!isLive || ANALYSIS.autoIntervalMs <= 0) return;
-    nextAt.current = Date.now() + ANALYSIS.autoIntervalMs;
+    const start = startedAt ? new Date(startedAt).getTime() : Date.now();
     const id = setInterval(() => {
-      const left = Math.ceil((nextAt.current - Date.now()) / 1000);
-      if (left <= 0) {
-        setRemaining(intervalSec);
-        run(true);
-      } else {
-        setRemaining(left);
-      }
+      const left = secondsToNextCycle(start, ANALYSIS.autoIntervalMs, Date.now());
+      if (left > prevLeft.current && prevLeft.current > 0) run(true);
+      prevLeft.current = left;
+      setRemaining(left);
     }, 1000);
     return () => clearInterval(id);
-  }, [isLive, intervalSec, run]);
+  }, [isLive, startedAt, run]);
 
   if (!open) {
     return (

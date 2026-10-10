@@ -3,23 +3,24 @@ import { notFound, redirect } from "next/navigation";
 import { setDraftQuestionBox, startDraftLesson, updateDraftLesson } from "@/app/actions/lessons";
 import { AutoRefresh } from "@/components/auto-refresh";
 import { LessonReady } from "@/components/lesson-ready/lesson-ready";
-import { LiveRoom } from "@/components/live-room";
 import type { Summary } from "@/lib/ai-client";
-import { StudentChat } from "@/components/student-chat";
+import { StudentHeader } from "@/components/student-live/header";
+import { StudentChat } from "@/components/student-live/chat";
+import { StudentStage } from "@/components/student-live/stage";
 import { TeacherHeader } from "@/components/teacher-live/header";
 import { TeacherPanel } from "@/components/teacher-live/panel";
 import { StageIdle, TeacherStage } from "@/components/teacher-live/stage";
 import { TIMEOUT_RULES } from "@/lib/config";
 import { getTeacher } from "@/lib/auth";
-import { createRoomToken, isLiveKitConfigured, type LiveRole } from "@/lib/livekit";
+import { createRoomToken, isLiveKitConfigured } from "@/lib/livekit";
 import { getParticipantId } from "@/lib/participant";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const LESSON_COLUMNS = "id, title, class_name, topic, join_code, status, chatbot_enabled, room_name";
+const LESSON_COLUMNS = "id, title, class_name, topic, join_code, status, chatbot_enabled, room_name, started_at";
 // Özet yalnızca öğretmen sorgusuna girer; öğrenci tarafına hiç çekilmez.
-const TEACHER_COLUMNS = `${LESSON_COLUMNS}, summary, summary_updated_at, started_at`;
+const TEACHER_COLUMNS = `${LESSON_COLUMNS}, summary, summary_updated_at`;
 
 type Lesson = {
   id: string;
@@ -68,33 +69,8 @@ async function Live({ params }: { params: PageProps<"/live/[lessonId]">["params"
   redirect("/");
 }
 
-function VideoPlaceholder({ message }: { message: string }) {
-  return (
-    <div className="flex aspect-video w-full items-center justify-center rounded-2xl border border-dashed border-border bg-card text-center">
-      <p className="px-6 text-sm text-muted">{message}</p>
-    </div>
-  );
-}
-
-// Video yalnızca ders canlıyken bağlanır. Yetki (yayın/izleme) token'da, sunucuda belirlenir.
-async function VideoArea({ lesson, role, identity }: { lesson: Lesson; role: LiveRole; identity: string }) {
-  if (lesson.status === "ended") return <VideoPlaceholder message="Ders sona erdi." />;
-  if (lesson.status !== "live") {
-    return <VideoPlaceholder message={role === "teacher" ? "Yayını açmak için dersi başlat." : "Ders henüz başlamadı. Başlayınca otomatik bağlanacaksın."} />;
-  }
-  if (!isLiveKitConfigured()) return <VideoPlaceholder message="Video yapılandırılmamış (LIVEKIT_* değişkenleri eksik)." />;
-
-  const { token, serverUrl } = await createRoomToken({ room: lesson.room_name, identity, role });
-  return <LiveRoom token={token} serverUrl={serverUrl} canPublish={role === "teacher"} />;
-}
-
-function RoleBadge({ label }: { label: string }) {
-  return (
-    <span className="mb-1 inline-block rounded-md bg-accent/15 px-2 py-0.5 text-xs font-semibold text-accent">
-      {label}
-    </span>
-  );
-}
+// Saf olmayan saat okuması bileşen gövdesinin dışında kalsın (React purity kuralı).
+const banCutoffIso = () => new Date(Date.now() - TIMEOUT_RULES.abuseSpamBanMs).toISOString();
 
 async function TeacherView({ lesson, identity }: { lesson: Lesson; identity: string }) {
   if (lesson.status === "draft") {
@@ -130,6 +106,7 @@ async function TeacherView({ lesson, identity }: { lesson: Lesson; identity: str
           lessonId={lesson.id}
           summary={lesson.summary ?? null}
           summaryUpdatedAt={lesson.summary_updated_at ?? null}
+          startedAt={lesson.started_at ?? null}
           isLive={live}
         />
       </div>
@@ -148,7 +125,7 @@ async function StudentView({ lesson, participantId }: { lesson: Lesson; particip
     .order("created_at");
 
   // Abuse veya spam nedeniyle 5 dakikalık kısıtlama kontrolü
-  const banCutoff = new Date(Date.now() - TIMEOUT_RULES.abuseSpamBanMs).toISOString();
+  const banCutoff = banCutoffIso();
   const { data: recentBan } = await admin
     .from("student_messages")
     .select("processed_at")
@@ -174,30 +151,37 @@ async function StudentView({ lesson, participantId }: { lesson: Lesson; particip
         ? "Ders sona erdi."
         : "Ders başlayınca soru yazabilirsin.";
 
+  const live = lesson.status === "live";
+  const room =
+    live && isLiveKitConfigured()
+      ? await createRoomToken({ room: lesson.room_name, identity: `student:${participantId}`, role: "student" })
+      : null;
+  const idleMessage =
+    lesson.status === "ended"
+      ? "Ders sona erdi."
+      : live
+        ? "Video yapılandırılmamış (LIVEKIT_* değişkenleri eksik)."
+        : "Ders henüz başlamadı. Başlayınca otomatik bağlanacaksın.";
+
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-6 px-6 py-8">
+    <div className="flex min-h-screen flex-col bg-paper text-ink min-[1100px]:h-screen">
       {/* Yalnızca ders başlamayı beklerken yenile; canlıyken video bileşenini sıfırlamasın. */}
       {lesson.status === "draft" && <AutoRefresh />}
-      <header>
-        <RoleBadge label="Öğrenci görünümü" />
-        <h1 className="text-2xl font-semibold">{lesson.title}</h1>
-        <p className="text-sm text-muted">
-          {lesson.class_name} · {lesson.topic}
-        </p>
-      </header>
-
-      <div className="grid flex-1 gap-6 lg:grid-cols-[1fr_22rem]">
-        <VideoArea lesson={lesson} role="student" identity={`student:${participantId}`} />
-
-        <aside className="flex h-[34rem] max-h-[85vh] flex-col gap-4 rounded-2xl border border-border bg-card p-5">
-          <h2 className="font-semibold">Sorularım</h2>
-          <StudentChat
-            lessonId={lesson.id}
-            messages={(messages ?? []).map((m) => ({ id: m.id, text: m.original_text }))}
-            blockedReason={blockedReason}
-            banUntil={banUntil}
-          />
-        </aside>
+      <StudentHeader label={`${lesson.title} · ${lesson.class_name} · ${lesson.topic}`} />
+      <div className="flex min-h-0 flex-1 flex-wrap gap-5 p-5 min-[1100px]:flex-nowrap">
+        {room ? (
+          <StudentStage token={room.token} serverUrl={room.serverUrl} startedAt={lesson.started_at ?? null} />
+        ) : (
+          <StageIdle title="Canlı ders" message={idleMessage} />
+        )}
+        <StudentChat
+          lessonId={lesson.id}
+          messages={(messages ?? []).map((m) => ({ id: m.id, text: m.original_text }))}
+          blockedReason={blockedReason}
+          banUntil={banUntil}
+          startedAt={lesson.started_at ?? null}
+          isLive={live}
+        />
       </div>
     </div>
   );

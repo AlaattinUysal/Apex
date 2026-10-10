@@ -23,4 +23,4 @@ export const ANALYSIS = {
       : Math.max(10, Number(process.env.NEXT_PUBLIC_AUTO_ANALYSIS_SECONDS) || 300) * 1000,
 } as const;
 
-export const STUDENT_REPLY = "Mesajın öğretmene iletilecek.";
+export const STUDENT_REPLY = "Bir sonraki özete eklenecek.";
