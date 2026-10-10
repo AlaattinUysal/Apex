@@ -39,15 +39,13 @@ Hesap yok, ad yok. Öğrenci yalnızca kendi sorularını görür; her mesajın 
 
 Solda kamera ve ekran paylaşımı, sağda **"Sınıfın soruları"** özeti. "Ders işleyişi ve geri bildirim" başlığı her zaman en üstte çıkar; kod ifadeleri ayrı etiketle gösterilir. Altta bir sonraki güncellemeye kalan süre ve **"Cevaplandı"** düğmesi var. Süre beklenmek istemezse sayaç düğmesine basınca özet anında güncellenir.
 
-![Öğretmen canlı ders (tasarım)](docs/screenshots/04-ogretmen-canli-ders.png)
+![Öğretmen canlı ders](docs/screenshots/04-ogretmen-canli-ders.jpg)
 
 ### Öğretmen — ders hazır
 
 Ders oluşturulunca katılım kodu paylaşılır, ders bilgileri düzenlenir ve "Dersi başlat"a basılır.
 
-![Ders hazır (tasarım)](docs/screenshots/06-ders-hazir.png)
-
-> Öğretmen ekranlarının görüntüleri tasarım dosyasından alınmıştır; uygulama bu tasarıma ölçülerek birebir uyarlandı.
+![Ders hazır](docs/screenshots/06-ders-hazir.jpg)
 
 ---
 
