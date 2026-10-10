@@ -9,6 +9,7 @@ const hanken = Hanken_Grotesk({
   subsets: ["latin", "latin-ext"],
   weight: ["400", "500", "600", "700"],
   display: "swap",
+  adjustFontFallback: false, // yedek yazı tipini tasarımdaki sıraya (Segoe UI/Georgia) bırak
 });
 
 // opsz (optik boyut) ekseni: büyük puntoda harfler daha dar/ince çizilir; tasarım taslağı da bu eksenle yükleniyor.
@@ -17,6 +18,7 @@ const fraunces = Fraunces({
   subsets: ["latin", "latin-ext"],
   axes: ["opsz"],
   display: "swap",
+  adjustFontFallback: false, // yedek yazı tipini tasarımdaki sıraya (Segoe UI/Georgia) bırak
 });
 
 const jetbrains = JetBrains_Mono({
@@ -24,6 +26,7 @@ const jetbrains = JetBrains_Mono({
   subsets: ["latin", "latin-ext"],
   weight: ["500", "600"],
   display: "swap",
+  adjustFontFallback: false, // yedek yazı tipini tasarımdaki sıraya (Segoe UI/Georgia) bırak
 });
 
 export const metadata: Metadata = {

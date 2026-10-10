@@ -50,7 +50,8 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  /* Tasarımdaki yedek sıra: Hanken Grotesk, Segoe UI, system-ui (→ gibi glifler için aynı yedek font) */
+  font-family: var(--font-sans), "Segoe UI", system-ui, sans-serif;
 }
 
 @layer components {
