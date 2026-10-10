@@ -2,7 +2,6 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { signOut } from "@/app/actions/auth";
-import { CreateLessonForm } from "@/components/create-lesson-form";
 import { getTeacher } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
@@ -43,7 +42,7 @@ async function Dashboard() {
 
       <section className="rounded-2xl border border-border bg-card p-6">
         <h2 className="mb-4 font-semibold">Yeni ders</h2>
-        <CreateLessonForm />
+        <Link href="/create" className="inline-flex min-h-12 items-center justify-center rounded-full bg-brand px-6 font-semibold text-white">Ders oluştur</Link>
       </section>
 
       <section className="flex flex-col gap-3">

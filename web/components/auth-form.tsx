@@ -3,12 +3,13 @@
 import { useActionState, useState } from "react";
 import { signIn, signUp } from "@/app/actions/auth";
 
-export function AuthForm() {
+export function AuthForm({ next = "/dashboard" }: { next?: "/create" | "/dashboard" }) {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [state, action, pending] = useActionState(mode === "signin" ? signIn : signUp, undefined);
 
   return (
     <form action={action} className="flex flex-col gap-3">
+      <input type="hidden" name="next" value={next} />
       <input
         name="email"
         type="email"

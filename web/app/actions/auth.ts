@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { authDestination } from "@/lib/auth-destination";
 
 export type FormState = { error?: string } | undefined;
 
@@ -20,7 +21,7 @@ export async function signIn(_: FormState, formData: FormData): Promise<FormStat
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return { error: "E-posta veya şifre hatalı." };
 
-  redirect("/dashboard");
+  redirect(authDestination(formData.get("next")));
 }
 
 export async function signUp(_: FormState, formData: FormData): Promise<FormState> {
@@ -35,7 +36,7 @@ export async function signUp(_: FormState, formData: FormData): Promise<FormStat
   // "Confirm email" açıksa oturum gelmez; kullanıcıdan maili onaylaması istenir.
   if (!data.session) return { error: "Kayıt alındı. E-postandaki onay bağlantısına tıkla, sonra giriş yap." };
 
-  redirect("/dashboard");
+  redirect(authDestination(formData.get("next")));
 }
 
 export async function signOut() {

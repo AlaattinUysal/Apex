@@ -3,8 +3,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AuthForm } from "@/components/auth-form";
 import { getTeacher } from "@/lib/auth";
+import { authDestination } from "@/lib/auth-destination";
 
-export default function LoginPage() {
+export default function LoginPage({ searchParams }: PageProps<"/login">) {
   return (
     <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center gap-6 px-6 py-16">
       <div>
@@ -14,15 +15,14 @@ export default function LoginPage() {
         <h1 className="mt-2 text-2xl font-semibold">Öğretmen girişi</h1>
       </div>
       <Suspense fallback={null}>
-        <RedirectIfSignedIn />
+        <LoginContent searchParams={searchParams} />
       </Suspense>
-      <AuthForm />
     </main>
   );
 }
 
-// Zaten giriş yapmışsa panele gönder. Oturum okuma istek zamanında olduğu için Suspense içinde.
-async function RedirectIfSignedIn() {
-  if (await getTeacher()) redirect("/dashboard");
-  return null;
+async function LoginContent({ searchParams }: { searchParams: PageProps<"/login">["searchParams"] }) {
+  const next = authDestination((await searchParams).next);
+  if (await getTeacher()) redirect(next);
+  return <AuthForm next={next} />;
 }

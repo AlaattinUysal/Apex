@@ -1,32 +1,51 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Check } from "lucide-react";
 import { JoinForm } from "@/components/join-form";
+import { LandingZoom } from "@/components/landing/landing-zoom";
+import styles from "@/components/join-page.module.css";
 
 export const metadata: Metadata = { title: "Derse katıl — Apex" };
 
 // Öğrenci katılım sayfası. Ad, e-posta, hesap yok; öğretmenin verdiği 6 haneli kod yeterli.
 export default function JoinPage() {
   return (
-    <div className="flex min-h-screen flex-col bg-paper text-ink">
-      <header className="mx-auto w-full max-w-[1200px] px-5 py-6 sm:px-8">
-        <Link href="/" className="font-display text-[30px] leading-[34px] font-semibold tracking-[-0.02em] text-ink no-underline">
-          Apex
-        </Link>
+    <div className={`lp-zoom min-h-[calc(100vh/var(--lp-zoom,1))] ${styles.page}`}>
+      <LandingZoom />
+      <header className={styles.header}>
+        <Link href="/" className={styles.logo}>Apex</Link>
+        <Link href="/create" className={styles.teacherLink}>Öğretmen misin? Ders oluştur</Link>
       </header>
 
-      <main className="mx-auto flex w-full max-w-[1200px] flex-1 items-start justify-center px-5 pb-16 sm:px-8 sm:pt-6">
-        <div className="flex w-full max-w-[460px] flex-col gap-6 rounded-[28px] border-[1.5px] border-ink bg-surface p-6 shadow-hard-8 sm:p-10">
-          <div className="flex flex-col gap-2">
-            <span className="self-start rounded-full border-[1.5px] border-ink bg-brand-tint px-3.5 py-1.5 text-[13px] leading-[18px] font-semibold">
-              Öğrenci
-            </span>
-            <h1 className="font-display text-4xl leading-[1.1] font-semibold tracking-[-0.02em]">Derse katıl</h1>
-            <p className="text-base leading-6 text-ink-muted">
-              Öğretmeninin verdiği kodu yaz. Ad, e-posta ya da hesap gerekmez; sorun anonim kalır.
-            </p>
+      <main className={styles.main}>
+        <section aria-label="Derse katıl" className={styles.joinPanel}>
+          <span className={styles.badge}><span />Öğrenci girişi</span>
+          <div className={styles.intro}>
+            <h1>Kodu gir,<br />utanmadan sor.</h1>
+            <p>Öğretmeninin tahtaya yazdığı ders kodunu gir. Ad, e-posta ya da hesap istemiyoruz.</p>
           </div>
           <JoinForm />
-        </div>
+        </section>
+        <aside className={styles.aside}>
+          <section aria-label="Derste seni ne bekliyor" className={styles.preview}>
+            <h2>Derste seni ne bekliyor?</h2>
+            <p>Dersi izlerken aklına takılanı yazarsın. Cevap hep aynıdır; gerisini Apex halleder.</p>
+            <div aria-hidden="true" className={styles.messages}>
+              <div className={styles.question}>hocam bu x niye eksi oldu anlamadım</div>
+              <div className={styles.reply}>
+                <span className={styles.check}><Check size={14} strokeWidth={3} /></span>
+                Mesajın öğretmene iletilecek.
+              </div>
+            </div>
+          </section>
+          <section aria-label="Gizlilik" className={styles.privacy}>
+            <ul>
+              <li><span />Ad, e-posta ya da hesap yok.</li>
+              <li><span />Kim olduğunu kimse görmez, öğretmen de.</li>
+              <li><span />Başkalarının mesajlarını göremezsin, onlar da seninkini.</li>
+            </ul>
+          </section>
+        </aside>
       </main>
     </div>
   );

@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import { notFound, redirect } from "next/navigation";
+import { setDraftQuestionBox, startDraftLesson, updateDraftLesson } from "@/app/actions/lessons";
 import { AutoRefresh } from "@/components/auto-refresh";
+import { LessonReady } from "@/components/lesson-ready/lesson-ready";
 import { LiveRoom } from "@/components/live-room";
 import type { Summary } from "@/lib/ai-client";
 import { StudentChat } from "@/components/student-chat";
@@ -95,6 +97,17 @@ function RoleBadge({ label }: { label: string }) {
 }
 
 async function TeacherView({ lesson, identity }: { lesson: Lesson; identity: string }) {
+  if (lesson.status === "draft") {
+    return (
+      <LessonReady
+        lesson={{ title: lesson.title, class_name: lesson.class_name, topic: lesson.topic, join_code: lesson.join_code, chatbot_enabled: lesson.chatbot_enabled }}
+        startAction={startDraftLesson.bind(null, lesson.id)}
+        toggleAction={setDraftQuestionBox.bind(null, lesson.id)}
+        updateAction={updateDraftLesson.bind(null, lesson.id)}
+      />
+    );
+  }
+
   const live = lesson.status === "live";
   const room = live && isLiveKitConfigured() ? await createRoomToken({ room: lesson.room_name, identity, role: "teacher" }) : null;
   const idleMessage =

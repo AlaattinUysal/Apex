@@ -1,0 +1,49 @@
+/* Join.dc.html: 1280 × 860 tasarım tuvali. */
+.page { background: var(--color-paper); color: var(--color-ink); }
+.header { max-width: 1200px; margin: 0 auto; padding: 22px 32px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; }
+.logo { font-family: var(--font-display); font-size: 30px; line-height: 34px; font-weight: 600; letter-spacing: -.02em; text-decoration: none; }
+.teacherLink { display: inline-flex; align-items: center; min-height: 44px; font-size: 14px; line-height: 20px; font-weight: 600; text-decoration: underline; }
+.main { max-width: 1200px; margin: 0 auto; padding: 24px 32px 80px; display: flex; flex-wrap: wrap; align-items: stretch; gap: 32px; }
+.joinPanel { flex: 1 1 600px; min-width: 0; display: flex; flex-direction: column; gap: 26px; padding: 40px; background: var(--color-surface); border: 1px solid var(--color-ink); border-radius: 28px; box-shadow: 8px 8px 0 var(--color-charcoal); }
+.badge { align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; background: var(--color-brand); color: white; font-size: 13px; line-height: 18px; font-weight: 600; white-space: nowrap; }
+.badge > span { flex: none; width: 8px; height: 8px; border-radius: 999px; background: var(--color-brand-tint); }
+.intro { display: flex; flex-direction: column; gap: 12px; }
+.intro h1 { margin: 0; font-family: var(--font-display); font-size: 56px; line-height: 58px; font-weight: 600; letter-spacing: -.025em; }
+.intro p { margin: 0; max-width: 520px; font-size: 17px; line-height: 26px; font-weight: 500; color: var(--color-ink-muted); }
+.form { display: flex; flex-direction: column; gap: 26px; }
+.codeField { display: flex; flex-direction: column; gap: 12px; }
+.codeLabel { font-size: 14px; line-height: 20px; font-weight: 700; }
+.codeInputs { display: flex; gap: 10px; }
+.codeInputs input { width: 72px; height: 92px; min-width: 0; padding: 0; border: 1px dashed var(--color-line-strong); border-radius: 14px; background: var(--color-sunken); color: var(--color-ink); text-align: center; font-family: var(--font-jetbrains), ui-monospace, Consolas, monospace; font-size: 44px; line-height: 52px; font-weight: 600; caret-color: var(--color-brand); }
+.codeInputs input[data-filled="true"] { border: 1px solid var(--color-ink); background: var(--color-surface); box-shadow: 4px 4px 0 var(--color-charcoal); }
+.codeInputs input:focus { outline: none; border: 2px solid var(--color-brand); background: var(--color-brand-tint); box-shadow: 4px 4px 0 var(--color-brand); }
+.hint { font-size: 14px; line-height: 20px; font-weight: 500; color: var(--color-ink-muted); }
+.submit { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 60px; padding: 0 28px; border: 1px solid var(--color-brand); border-radius: 999px; background: var(--color-brand); color: white; font-size: 18px; line-height: 24px; font-weight: 700; box-shadow: 5px 5px 0 var(--color-charcoal); cursor: pointer; }
+.submit:disabled { opacity: .6; cursor: wait; }
+.error { font-size: 14px; line-height: 20px; font-weight: 600; color: var(--color-badge); }
+.aside { flex: 1 1 380px; min-width: 0; display: flex; flex-direction: column; gap: 24px; }
+.preview { flex: 1; display: flex; flex-direction: column; gap: 16px; padding: 28px; background: var(--color-brand-tint); border: 1px solid var(--color-ink); border-radius: 24px; }
+.preview h2 { margin: 0; font-family: var(--font-display); font-size: 28px; line-height: 32px; font-weight: 600; letter-spacing: -.015em; }
+.preview p { margin: 0; font-size: 15px; line-height: 22px; font-weight: 500; }
+.messages { display: flex; flex-direction: column; gap: 10px; padding-top: 4px; }
+.question, .reply { box-sizing: content-box; max-width: 88%; padding: 10px 14px; border: 1px solid var(--color-ink); background: var(--color-surface); font-size: 15px; line-height: 22px; }
+.question { align-self: flex-end; border-radius: 18px 18px 6px 18px; font-weight: 500; transform: rotate(1deg); }
+.reply { align-self: flex-start; display: inline-flex; align-items: center; gap: 10px; border-radius: 18px 18px 18px 6px; box-shadow: 4px 4px 0 var(--color-charcoal); font-weight: 600; }
+.check { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 999px; background: var(--color-brand); color: white; }
+.privacy { display: flex; flex-direction: column; gap: 14px; padding: 28px; background: var(--color-charcoal); border-radius: 24px; }
+.privacy ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 14px; }
+.privacy li { display: flex; align-items: center; gap: 12px; font-size: 16px; line-height: 24px; font-weight: 600; color: var(--color-paper); }
+.privacy li > span { flex: none; width: 10px; height: 10px; border-radius: 999px; background: var(--color-brand-tint); }
+.page :is(a, button):focus-visible { outline: 3px solid var(--color-brand); outline-offset: 4px; }
+@media (max-width: 639px) {
+  .header { padding: 22px 20px; }
+  .teacherLink { max-width: 170px; }
+  .main { padding: 24px 20px 64px; gap: 28px; }
+  .joinPanel { padding: 24px; }
+  .intro h1 { font-size: 40px; line-height: 43px; }
+  .codeInputs { gap: 8px; }
+  .codeInputs input { flex: 1 1 0; width: 0; height: 64px; border-radius: 10px; font-size: 30px; line-height: 38px; }
+  .preview, .privacy { padding: 24px; }
+  .preview { min-height: 300px; }
+  .question, .reply { box-sizing: border-box; max-width: 94%; }
+}
