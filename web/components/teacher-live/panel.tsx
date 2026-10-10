@@ -209,7 +209,7 @@ export function TeacherPanel({
           disabled={!isLive || analysing}
           onClick={() => run(false)}
           title="Şimdi güncelle"
-          className="flex items-center gap-3 border-0 bg-transparent p-0 text-left disabled:cursor-default"
+          className="flex cursor-pointer items-center gap-3 border-0 bg-transparent p-0 text-left hover:opacity-80 disabled:cursor-default"
         >
           <svg
             width="44"
