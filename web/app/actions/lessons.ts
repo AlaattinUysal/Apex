@@ -63,7 +63,7 @@ export async function setLessonStatus(lessonId: string, status: "live" | "ended"
   if (status === "ended") {
     // Odayı kapat: öğrencilerin video bağlantısı kopar ve ekranları "Ders sona erdi"ye döner.
     if (data && isLiveKitConfigured()) await closeRoom(data.room_name).catch(() => {});
-    redirect("/dashboard");
+    redirect("/create");
   }
 
   refresh();

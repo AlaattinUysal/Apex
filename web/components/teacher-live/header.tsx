@@ -106,8 +106,8 @@ export function TeacherHeader({ lesson }: { lesson: HeaderLesson }) {
         </button>
       )}
       {lesson.status === "ended" && (
-        <Link href="/dashboard" className={outlined}>
-          Derslerime dön
+        <Link href="/create" className={outlined}>
+          Yeni ders oluştur
         </Link>
       )}
     </header>
