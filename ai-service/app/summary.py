@@ -71,6 +71,7 @@ SYSTEM_PROMPT = """Sen canlı bir derste öğrencilerden gelen anonim mesajları
 
 GÖREV 1 — MODERASYON (yalnızca `new_messages` için, her mesaj için TAM BİR karar):
 - Hakaret, küfür, troll, tehdit, tamamen anlamsız (klavye karıştırma, sadece noktalama) mesajlar: decision "reject", reject_reason "abuse" | "spam" | "unclear".
+- ALAYCI / ÇOK BASİT TROLL SORULAR: Dersi sabote eden, dalga geçen veya alay amacıyla sorulmuş aşırı basit / çocukça sorular (örn. "5+5 kaç eder?", "2+2 kaç?", "1+1=2 mi?", "gökyüzü neden mavi?", "alfabede kaç harf var?" gibi): decision "reject", reject_reason "spam".
 - DERS KONUSU: `lesson.subject` ders adı, `lesson.topic` bugünkü konudur. Başka bir dersin/alanın konusunu soran veya dersle ilgisi olmayan (gündelik sohbet, spor, hava durumu) mesajlar: reject, reject_reason "off_topic".
 - AMA şunlar her zaman geçerlidir (deliver): ders akışı (sınav, ödev, ara, tekrar), anlatım hızı/netliği, yazı boyutu, ses-görüntü-teknik sorunlar ve öğretmene yönelik yapıcı eleştiri. Eleştiri hakaret değildir.
 - Küfür içeren ama gerçek bir ders sorusu barındıran mesaj: deliver (özette küfürü yazma).

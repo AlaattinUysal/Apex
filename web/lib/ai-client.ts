@@ -134,9 +134,23 @@ async function callSummaryService(request: SummaryRequest): Promise<SummaryRespo
 }
 
 function mockSummarize(request: SummaryRequest): SummaryResponse {
-  const all = [...request.approved, ...request.new_messages];
+  const decisions = request.new_messages.map((m) => {
+    const textLower = m.text.toLowerCase();
+    if (["aptal", "boş yapma", "salak", "küfür"].some((w) => textLower.includes(w))) {
+      return { message_id: m.message_id, decision: "reject" as const, reject_reason: "abuse" as const };
+    }
+    if (["5+5", "2+2", "1+1", "kaç eder"].some((w) => textLower.includes(w))) {
+      return { message_id: m.message_id, decision: "reject" as const, reject_reason: "spam" as const };
+    }
+    return { message_id: m.message_id, decision: "deliver" as const, reject_reason: null };
+  });
+
+  const deliveredIds = new Set(decisions.filter((d) => d.decision === "deliver").map((d) => d.message_id));
+  const deliveredNew = request.new_messages.filter((m) => deliveredIds.has(m.message_id));
+  const all = [...request.approved, ...deliveredNew];
+
   return {
-    decisions: request.new_messages.map((m) => ({ message_id: m.message_id, decision: "deliver", reject_reason: null })),
+    decisions,
     summary: {
       sections: all.length
         ? [{ title: "Sahte özet (AI_MOCK)", items: [{ text: `${all.length} mesaj sahte olarak özetlendi.` }] }]
