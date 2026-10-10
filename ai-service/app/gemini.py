@@ -16,6 +16,7 @@ SYSTEM_PROMPT = """Sen canlı bir derste öğrencilerden gelen anonim soruları 
 GÖREVLERİN:
 1. Gelen mesajları tek tek incele:
    - Hakaret, küfür, argo, troll veya tamamen anlamsız mesajları ele: decision: "reject", reject_reason: "abuse" (veya "spam", "unclear", "off_topic"), card_ref: null.
+   - Alaycı ve çok basit troll sorular: Dersi sabote eden, dalga geçen veya alay amacıyla sorulmuş aşırı basit / çocukça sorular (örn. "5+5 kaç eder?", "2+2 kaç?", "1+1=2 mi?", "gökyüzü neden mavi?", "alfabede kaç harf var?" gibi): decision: "reject", reject_reason: "spam", card_ref: null.
    - Anlamlı ders soruları veya yapıcı geri bildirimler (örn. "Hocam anlatım çok hızlı") geçerlidir: decision: "deliver". Eleştiri hakaret değildir!
    - Küfür içeren ama içinde gerçek bir soru barındıran mesaj varsa, soruyu küfürden arındırıp deliver et.
 
@@ -85,6 +86,15 @@ def generate_mock_response(request: AnalyzeBatchRequest) -> AnalyzeBatchResponse
                     message_id=msg.message_id,
                     decision="reject",
                     reject_reason="abuse",
+                    card_ref=None
+                )
+            )
+        elif any(troll in text_lower for troll in ["5+5", "2+2", "1+1", "kaç eder"]):
+            decisions.append(
+                MessageDecision(
+                    message_id=msg.message_id,
+                    decision="reject",
+                    reject_reason="spam",
                     card_ref=None
                 )
             )
